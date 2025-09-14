@@ -154,7 +154,11 @@ public class NethereumBlockchainClient : IDisposable
             var function = _contract.GetFunction("createMemo");
             
             // Estimate gas for the transaction
+            // need from else this throws in sc
             var gasEstimate = await function.EstimateGasAsync(
+                _account.Address,
+                new HexBigInteger(0),
+                new HexBigInteger(0),
                 jobId,
                 content,
                 (int)memoType,
@@ -342,7 +346,11 @@ public class NethereumBlockchainClient : IDisposable
             var function = _contract.GetFunction("setBudgetWithPaymentToken");
             
             // Estimate gas for the transaction
+            // need to add from here, else msg_sender is wrong and this throws in the contract
             var gasEstimate = await function.EstimateGasAsync(
+                _account.Address,
+                new HexBigInteger(0),
+                new HexBigInteger(0),
                 jobId,
                 formattedBudget,
                 tokenAddress

@@ -224,7 +224,7 @@ public class VirtualsACPClient : IDisposable
         
         // Set budget
         await _blockchainClient.SetBudgetWithPaymentTokenAsync((int)jobId, amount);
-        await Task.Delay(10000); // Wait 10 seconds
+        await Task.Delay(3000);
 
         // Create initial memo
         var memoContent = serviceRequirement is string str 

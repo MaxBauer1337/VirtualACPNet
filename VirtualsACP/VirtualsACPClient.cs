@@ -35,7 +35,7 @@ public class VirtualsACPClient : IDisposable
         _logger = logger;
 
         // Initialize blockchain client
-        _blockchainClient = new NethereumBlockchainClient(walletPrivateKey, _config, logger);
+        _blockchainClient = new NethereumBlockchainClient(walletPrivateKey, _config, logger, signerAddress: agentWalletAddress);
         _agentAddress = agentWalletAddress ?? _blockchainClient.AgentAddress;
 
         // Initialize API client
@@ -44,7 +44,7 @@ public class VirtualsACPClient : IDisposable
         // Initialize SignalR client if callbacks are provided
         if (onNewTask != null || onEvaluate != null)
         {
-            _signalRClient = new ACPSocketIO(_config.AcpApiUrl, logger);
+            _signalRClient = new ACPSocketIO(_config.AcpApiUrl, logger, _agentAddress);
             _signalRClient.OnNewTask += HandleNewTaskAsync;
             _signalRClient.OnEvaluate += HandleEvaluateAsync;
             OnNewTask = onNewTask;
@@ -91,16 +91,16 @@ public class VirtualsACPClient : IDisposable
                 }
             }
 
-            var memoToSignId = jobData.TryGetValue("memoToSign", out var memoToSignValue) 
-                ? JsonSerializer.Deserialize<int?>(memoToSignValue.ToString() ?? "null") 
+            var memoToSignId = jobData.TryGetValue("memoToSign", out var memoToSignValue)
+                ? JsonSerializer.Deserialize<int?>(memoToSignValue.ToString() ?? "null")
                 : null;
 
-            var memoToSign = memoToSignId.HasValue 
-                ? memos.FirstOrDefault(m => m.Id == memoToSignId.Value) 
+            var memoToSign = memoToSignId.HasValue
+                ? memos.FirstOrDefault(m => m.Id == memoToSignId.Value)
                 : null;
 
-            var context = jobData.TryGetValue("context", out var contextValue) 
-                ? JsonSerializer.Deserialize<Dictionary<string, object>>(contextValue.ToString() ?? "{}") 
+            var context = jobData.TryGetValue("context", out var contextValue)
+                ? JsonSerializer.Deserialize<Dictionary<string, object>>(contextValue.ToString() ?? "{}")
                 : null;
 
             var job = new ACPJob
@@ -149,8 +149,8 @@ public class VirtualsACPClient : IDisposable
                 }
             }
 
-            var context = jobData.TryGetValue("context", out var contextValue) 
-                ? JsonSerializer.Deserialize<Dictionary<string, object>>(contextValue.ToString() ?? "{}") 
+            var context = jobData.TryGetValue("context", out var contextValue)
+                ? JsonSerializer.Deserialize<Dictionary<string, object>>(contextValue.ToString() ?? "{}")
                 : null;
 
             var job = new ACPJob
@@ -216,19 +216,19 @@ public class VirtualsACPClient : IDisposable
 
         // Create job on blockchain
         var txHash = await _blockchainClient.CreateJobAsync(providerAddress, evalAddr, expiredAt.Value);
-        
+
         // Wait for transaction to be mined and get job ID
         await Task.Delay(3000); // Wait 3 seconds for transaction to be mined
-        
+
         var jobId = await _blockchainClient.GetJobIdFromTransactionAsync(txHash);
-        
+
         // Set budget
         await _blockchainClient.SetBudgetWithPaymentTokenAsync((int)jobId, amount);
         await Task.Delay(3000);
 
         // Create initial memo
-        var memoContent = serviceRequirement is string str 
-            ? str 
+        var memoContent = serviceRequirement is string str
+            ? str
             : JsonSerializer.Serialize(serviceRequirement);
 
         await _blockchainClient.CreateMemoAsync(
@@ -253,7 +253,7 @@ public class VirtualsACPClient : IDisposable
             ["price"] = amount
         };
 
-        await _apiClient.CreateJobAsync(payload);
+        //await _apiClient.CreateJobAsync(payload);
 
         return (int)jobId;
     }
@@ -267,14 +267,14 @@ public class VirtualsACPClient : IDisposable
     {
         try
         {
-            var txHash = await _blockchainClient.SignMemoAsync(memoId, accept, reason ?? "");
-            
+            var txHash = await _blockchainClient.SignMemoAsync(memoId, accept, reason ?? "", useSmartContractSigning: true);
+
             if (!accept)
                 return txHash;
 
             await Task.Delay(10000); // Wait 10 seconds
 
-            _logger?.LogInformation("Responding to job {JobId} with memo {MemoId} and accept {Accept} and reason {Reason}", 
+            _logger?.LogInformation("Responding to job {JobId} with memo {MemoId} and accept {Accept} and reason {Reason}",
                 jobId, memoId, accept, reason);
 
             await _blockchainClient.CreateMemoAsync(
@@ -285,7 +285,7 @@ public class VirtualsACPClient : IDisposable
                 AcpJobPhase.Transaction
             );
 
-            _logger?.LogInformation("Responded to job {JobId} with memo {MemoId} and accept {Accept} and reason {Reason}", 
+            _logger?.LogInformation("Responded to job {JobId} with memo {MemoId} and accept {Accept} and reason {Reason}",
                 jobId, memoId, accept, reason);
 
             return txHash;
@@ -310,7 +310,7 @@ public class VirtualsACPClient : IDisposable
         await Task.Delay(10000); // Wait 10 seconds
 
         reason = !string.IsNullOrEmpty(reason) ? reason : $"Job {jobId} paid.";
-        _logger?.LogInformation("Paid for job {JobId} with memo {MemoId} and amount {Amount} and reason {Reason}", 
+        _logger?.LogInformation("Paid for job {JobId} with memo {MemoId} and amount {Amount} and reason {Reason}",
             jobId, memoId, amount, reason);
 
         var txHash = await _blockchainClient.CreateMemoAsync(
@@ -448,7 +448,7 @@ public class VirtualsACPClient : IDisposable
     public async Task<string> SignMemoAsync(int memoId, bool accept, string? reason = "")
     {
         var txHash = await _blockchainClient.SignMemoAsync(memoId, accept, reason ?? "");
-        _logger?.LogInformation("Signed memo for memo ID {MemoId} is {Status}, tx_hash: {TxHash}", 
+        _logger?.LogInformation("Signed memo for memo ID {MemoId} is {Status}, tx_hash: {TxHash}",
             memoId, accept ? "accepted" : "rejected", txHash);
         return txHash;
     }

@@ -14,7 +14,7 @@ public class ACPSocketIO : IDisposable
     public event Func<object, Task>? OnEvaluate;
     public event Func<object, Task>? OnNewTask;
 
-    public ACPSocketIO(string socketUrl, ILogger? logger = null)
+    public ACPSocketIO(string socketUrl, ILogger? logger = null, string agent = null)
     {
         _logger = logger;
 
@@ -38,7 +38,12 @@ public class ACPSocketIO : IDisposable
                 ["x-sdk-version"] = VirtualsAcp.Version,
                 ["x-sdk-language"] = "csharp"
             },
-           
+
+            Auth = new Dictionary<string, string>
+            {
+                ["walletAddress"] = agent,
+            },
+
             ConnectionTimeout = TimeSpan.FromSeconds(20),
 
             // Enable all transports as fallback

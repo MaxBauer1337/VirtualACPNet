@@ -610,4 +610,81 @@ public static class ContractAbis
     ""type"": ""event""
   }
 ]";
+
+    public static readonly string Eip1271Abi = @"[
+  {
+    ""inputs"": [
+      {
+        ""internalType"": ""bytes32"",
+        ""name"": ""hash"",
+        ""type"": ""bytes32""
+      },
+      {
+        ""internalType"": ""bytes"",
+        ""name"": ""signature"",
+        ""type"": ""bytes""
+      }
+    ],
+    ""name"": ""isValidSignature"",
+    ""outputs"": [
+      {
+        ""internalType"": ""bytes4"",
+        ""name"": """",
+        ""type"": ""bytes4""
+      }
+    ],
+    ""stateMutability"": ""view"",
+    ""type"": ""function""
+  }
+]";
+
+    public static readonly string SemiModularAccountAbi = @"[
+  {
+    ""inputs"": [
+      {
+        ""internalType"": ""address"",
+        ""name"": ""target"",
+        ""type"": ""address""
+      },
+      {
+        ""internalType"": ""uint256"",
+        ""name"": ""value"",
+        ""type"": ""uint256""
+      },
+      {
+        ""internalType"": ""bytes"",
+        ""name"": ""data"",
+        ""type"": ""bytes""
+      }
+    ],
+    ""name"": ""execute"",
+    ""outputs"": [],
+    ""stateMutability"": ""nonpayable"",
+    ""type"": ""function""
+  },
+  {
+    ""inputs"": [
+      {
+        ""internalType"": ""bytes32"",
+        ""name"": ""hash"",
+        ""type"": ""bytes32""
+      },
+      {
+        ""internalType"": ""bytes"",
+        ""name"": ""signature"",
+        ""type"": ""bytes""
+      }
+    ],
+    ""name"": ""isValidSignature"",
+    ""outputs"": [
+      {
+        ""internalType"": ""bytes4"",
+        ""name"": """",
+        ""type"": ""bytes4""
+      }
+    ],
+    ""stateMutability"": ""view"",
+    ""type"": ""function""
+  }
+]";
 }

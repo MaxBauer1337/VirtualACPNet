@@ -403,7 +403,12 @@ public class NethereumBlockchainClient : IDisposable
                 throw new AcpContractError($"Transaction not found: {txHash}");
 
             // Get the job ID directly from the transaction receipt data
-            var jobId = new BigInteger(receipt.Logs[0].Data.HexToByteArray());
+            var hexData = receipt.Logs[0].Data;
+            // Remove 0x prefix and leading zeros, then convert to BigInteger
+            var cleanHex = hexData.StartsWith("0x") ? hexData[2..] : hexData;
+            cleanHex = cleanHex.TrimStart('0');
+            if (string.IsNullOrEmpty(cleanHex)) cleanHex = "0";
+            var jobId = BigInteger.Parse(cleanHex, System.Globalization.NumberStyles.HexNumber);
             
             _logger?.LogInformation("Job ID extracted from transaction data: {JobId}", jobId);
             return jobId;

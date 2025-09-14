@@ -1,13 +1,9 @@
 namespace VirtualsAcp.Models;
 
-public enum AcpMemoStatus
-{
-    Pending,
-    Approved,
-    Rejected,
-    Expired
-}
 
+/// <summary>
+/// todo this is probably wrong
+/// </summary>
 public enum MemoType
 {
     Message = 0,

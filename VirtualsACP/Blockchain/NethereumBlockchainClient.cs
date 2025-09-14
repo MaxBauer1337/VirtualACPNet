@@ -268,6 +268,9 @@ public class NethereumBlockchainClient : IDisposable
             
             // Estimate gas for the transaction
             var gasEstimate = await function.EstimateGasAsync(
+                _account.Address,
+                new HexBigInteger(0),
+                new HexBigInteger(0),
                 memoId,
                 isApproved,
                 reason

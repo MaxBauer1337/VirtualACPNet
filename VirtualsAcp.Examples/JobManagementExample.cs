@@ -21,7 +21,7 @@ public class JobManagementExample
         var client = new VirtualsACPClient(
             walletPrivateKey: "0000000000000000000000000000000000000000000000000000000000000001",
             entityId: 12345,
-            config: Configurations.BaseSepoliaConfig,
+            config: Configurations.BaseMainnetConfig,
             onNewTask: async (job, memoToSign) =>
             {
                 Console.WriteLine($"📨 New task received: Job {job.Id}");

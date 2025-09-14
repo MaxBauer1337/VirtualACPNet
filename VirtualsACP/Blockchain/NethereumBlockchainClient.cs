@@ -8,6 +8,7 @@ using VirtualsAcp.Abi;
 using VirtualsAcp.Configs;
 using VirtualsAcp.Exceptions;
 using VirtualsAcp.Models;
+using Nethereum.Hex.HexTypes;
 
 namespace VirtualsAcp.Blockchain;
 
@@ -71,8 +72,24 @@ public class NethereumBlockchainClient : IDisposable
             var expireTimestamp = new BigInteger(((DateTimeOffset)expiredAt).ToUnixTimeSeconds());
             
             var function = _contract.GetFunction("createJob");
+            
+            // Estimate gas for the transaction
+            var gasEstimate = await function.EstimateGasAsync(
+                providerAddress,
+                evaluatorAddress,
+                expireTimestamp
+            );
+            
+            // Add 20% buffer to the gas estimate
+            var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
+            
+            _logger?.LogInformation("Estimated gas for createJob: {GasEstimate}, using gas limit: {GasLimit}", 
+                gasEstimate.Value, gasLimit);
+            
             var txHash = await function.SendTransactionAsync(
                 _account.Address,
+                gasLimit.ToHexBigInteger(),
+                new BigInteger(0).ToHexBigInteger(), // gasPrice - let Nethereum handle this
                 providerAddress,
                 evaluatorAddress,
                 expireTimestamp
@@ -95,8 +112,22 @@ public class NethereumBlockchainClient : IDisposable
             var formattedAmount = FormatAmount(amount);
             
             var function = _tokenContract.GetFunction("approve");
+            
+            // Estimate gas for the transaction
+            var gasEstimate = await function.EstimateGasAsync(
+                formattedAmount
+            );
+            
+            // Add 20% buffer to the gas estimate
+            var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
+            
+            _logger?.LogInformation("Estimated gas for approve: {GasEstimate}, using gas limit: {GasLimit}", 
+                gasEstimate.Value, gasLimit);
+            
             var txHash = await function.SendTransactionAsync(
                 _account.Address,
+                gasLimit.ToHexBigInteger(),
+                new BigInteger(0).ToHexBigInteger(), // gasPrice - let Nethereum handle this
                 _config.ContractAddress,
                 formattedAmount
             );
@@ -121,8 +152,26 @@ public class NethereumBlockchainClient : IDisposable
         try
         {
             var function = _contract.GetFunction("createMemo");
+            
+            // Estimate gas for the transaction
+            var gasEstimate = await function.EstimateGasAsync(
+                jobId,
+                content,
+                (int)memoType,
+                isSecured,
+                (int)nextPhase
+            );
+            
+            // Add 20% buffer to the gas estimate
+            var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
+            
+            _logger?.LogInformation("Estimated gas for createMemo: {GasEstimate}, using gas limit: {GasLimit}", 
+                gasEstimate.Value, gasLimit);
+            
             var txHash = await function.SendTransactionAsync(
                 _account.Address,
+                gasLimit.ToHexBigInteger(),
+                new BigInteger(0).ToHexBigInteger(), // gasPrice - let Nethereum handle this
                 jobId,
                 content,
                 (int)memoType,
@@ -160,8 +209,31 @@ public class NethereumBlockchainClient : IDisposable
             var expireTimestamp = new BigInteger(((DateTimeOffset)expiredAt).ToUnixTimeSeconds());
             
             var function = _contract.GetFunction("createPayableMemo");
+            
+            // Estimate gas for the transaction
+            var gasEstimate = await function.EstimateGasAsync(
+                jobId,
+                content,
+                tokenAddress,
+                formattedAmount,
+                receiverAddress,
+                formattedFeeAmount,
+                (int)feeType,
+                (int)memoType,
+                (int)nextPhase,
+                expireTimestamp
+            );
+            
+            // Add 20% buffer to the gas estimate
+            var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
+            
+            _logger?.LogInformation("Estimated gas for createPayableMemo: {GasEstimate}, using gas limit: {GasLimit}", 
+                gasEstimate.Value, gasLimit);
+            
             var txHash = await function.SendTransactionAsync(
                 _account.Address,
+                gasLimit.ToHexBigInteger(),
+                new BigInteger(0).ToHexBigInteger(), // gasPrice - let Nethereum handle this
                 jobId,
                 content,
                 tokenAddress,
@@ -189,8 +261,24 @@ public class NethereumBlockchainClient : IDisposable
         try
         {
             var function = _contract.GetFunction("signMemo");
+            
+            // Estimate gas for the transaction
+            var gasEstimate = await function.EstimateGasAsync(
+                memoId,
+                isApproved,
+                reason
+            );
+            
+            // Add 20% buffer to the gas estimate
+            var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
+            
+            _logger?.LogInformation("Estimated gas for signMemo: {GasEstimate}, using gas limit: {GasLimit}", 
+                gasEstimate.Value, gasLimit);
+            
             var txHash = await function.SendTransactionAsync(
                 _account.Address,
+                gasLimit.ToHexBigInteger(),
+                new BigInteger(0).ToHexBigInteger(), // gasPrice - let Nethereum handle this
                 memoId,
                 isApproved,
                 reason
@@ -213,8 +301,23 @@ public class NethereumBlockchainClient : IDisposable
             var formattedBudget = FormatAmount(budget);
             
             var function = _contract.GetFunction("setBudget");
+            
+            // Estimate gas for the transaction
+            var gasEstimate = await function.EstimateGasAsync(
+                jobId,
+                formattedBudget
+            );
+            
+            // Add 20% buffer to the gas estimate
+            var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
+            
+            _logger?.LogInformation("Estimated gas for setBudget: {GasEstimate}, using gas limit: {GasLimit}", 
+                gasEstimate.Value, gasLimit);
+            
             var txHash = await function.SendTransactionAsync(
                 _account.Address,
+                gasLimit.ToHexBigInteger(),
+                new BigInteger(0).ToHexBigInteger(), // gasPrice - let Nethereum handle this
                 jobId,
                 formattedBudget
             );
@@ -237,8 +340,24 @@ public class NethereumBlockchainClient : IDisposable
             var tokenAddress = paymentTokenAddress ?? _config.PaymentTokenAddress;
             
             var function = _contract.GetFunction("setBudgetWithPaymentToken");
+            
+            // Estimate gas for the transaction
+            var gasEstimate = await function.EstimateGasAsync(
+                jobId,
+                formattedBudget,
+                tokenAddress
+            );
+            
+            // Add 20% buffer to the gas estimate
+            var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
+            
+            _logger?.LogInformation("Estimated gas for setBudgetWithPaymentToken: {GasEstimate}, using gas limit: {GasLimit}", 
+                gasEstimate.Value, gasLimit);
+            
             var txHash = await function.SendTransactionAsync(
                 _account.Address,
+                gasLimit.ToHexBigInteger(),
+                new BigInteger(0).ToHexBigInteger(), // gasPrice - let Nethereum handle this
                 jobId,
                 formattedBudget,
                 tokenAddress
@@ -277,17 +396,17 @@ public class NethereumBlockchainClient : IDisposable
             if (receipt.Status.Value != 1)
                 throw new TransactionFailedError($"Transaction failed: {txHash}");
 
-            // Look for JobCreated event
-            var jobCreatedEvent = _contract.GetEvent("JobCreated");
-            var logs = jobCreatedEvent.DecodeAllEventsForEvent<JobCreatedEventDTO>(receipt.Logs);
+            // Get the transaction to access the return data
+            var transaction = await _web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync(txHash);
             
-            if (logs.Any())
-            {
-                var log = logs.First();
-                return log.Event.JobId;
-            }
+            if (transaction == null)
+                throw new AcpContractError($"Transaction not found: {txHash}");
 
-            throw new AcpContractError($"No JobCreated event found in transaction: {txHash}");
+            // Get the job ID directly from the transaction receipt data
+            var jobId = new BigInteger(receipt.Logs[0].Data.HexToByteArray());
+            
+            _logger?.LogInformation("Job ID extracted from transaction data: {JobId}", jobId);
+            return jobId;
         }
         catch (Exception ex)
         {

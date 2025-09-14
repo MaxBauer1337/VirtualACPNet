@@ -108,9 +108,6 @@ public class AgentSearchExample
                     }
                 }
             }
-
-            Console.WriteLine("\nPress any key to exit...");
-            Console.ReadKey();
         }
         catch (Exception ex)
         {

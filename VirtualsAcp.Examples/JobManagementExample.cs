@@ -130,9 +130,6 @@ public class JobManagementExample
             );
 
             Console.WriteLine($"✅ Evaluation completed: {evaluationTxHash}");
-
-            Console.WriteLine("\nPress any key to exit...");
-            Console.ReadKey();
         }
         catch (Exception ex)
         {

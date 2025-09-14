@@ -26,9 +26,6 @@ public class ConfigurationExample
         // Example 2: Using environment variables
         Console.WriteLine("\n4. Using Environment Variables");
         await CreateClientWithEnvironmentVariables();
-
-        Console.WriteLine("\nPress any key to exit...");
-        Console.ReadKey();
     }
 
     private static async Task CreateClientWithConfig(AcpContractConfig config, string configName)

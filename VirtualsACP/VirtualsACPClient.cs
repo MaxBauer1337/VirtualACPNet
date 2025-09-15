@@ -267,7 +267,7 @@ public class VirtualsACPClient : IDisposable
     {
         try
         {
-            var txHash = await _blockchainClient.SignMemoAsync(memoId, accept, reason ?? "", useSmartContractSigning: true);
+            var txHash = await _blockchainClient.SignMemoAsync(memoId, accept, reason ?? "", true);
 
             if (!accept)
                 return txHash;
@@ -282,7 +282,8 @@ public class VirtualsACPClient : IDisposable
                 content ?? $"Job {jobId} accepted. {reason ?? ""}",
                 MemoType.Message,
                 false,
-                AcpJobPhase.Transaction
+                AcpJobPhase.Transaction,
+                useSmartContractSigning: true
             );
 
             _logger?.LogInformation("Responded to job {JobId} with memo {MemoId} and accept {Accept} and reason {Reason}",
@@ -304,10 +305,8 @@ public class VirtualsACPClient : IDisposable
         string? reason = "")
     {
         await _blockchainClient.ApproveAllowanceAsync(amount);
-        await Task.Delay(10000); // Wait 10 seconds
 
         await _blockchainClient.SignMemoAsync(memoId, true, reason ?? "");
-        await Task.Delay(10000); // Wait 10 seconds
 
         reason = !string.IsNullOrEmpty(reason) ? reason : $"Job {jobId} paid.";
         _logger?.LogInformation("Paid for job {JobId} with memo {MemoId} and amount {Amount} and reason {Reason}",
@@ -439,7 +438,8 @@ public class VirtualsACPClient : IDisposable
             deliverableJson,
             MemoType.ObjectUrl,
             true,
-            AcpJobPhase.Completed
+            AcpJobPhase.Completed,
+            useSmartContractSigning : true
         );
 
         return txHash;

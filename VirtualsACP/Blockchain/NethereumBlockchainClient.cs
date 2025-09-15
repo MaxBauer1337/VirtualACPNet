@@ -1,18 +1,19 @@
-using System.Numerics;
 using Microsoft.Extensions.Logging;
-using Nethereum.Web3;
-using Nethereum.Web3.Accounts;
+using Nethereum.ABI.EIP712;
+using Nethereum.ABI.FunctionEncoding.Attributes;
 using Nethereum.Contracts;
 using Nethereum.Hex.HexConvertors.Extensions;
+using Nethereum.Hex.HexTypes;
+using Nethereum.Signer;
+using Nethereum.Util;
+using Nethereum.Web3;
+using Nethereum.Web3.Accounts;
+using System;
+using System.Numerics;
 using VirtualsAcp.Abi;
 using VirtualsAcp.Configs;
 using VirtualsAcp.Exceptions;
 using VirtualsAcp.Models;
-using Nethereum.Hex.HexTypes;
-using Nethereum.Signer;
-using Nethereum.Util;
-using Nethereum.ABI.EIP712;
-using Nethereum.ABI.FunctionEncoding.Attributes;
 
 namespace VirtualsAcp.Blockchain;
 
@@ -35,14 +36,14 @@ public class NethereumBlockchainClient : IDisposable
         _config = config;
         _logger = logger;
         _signerAddress = signerAddress;
-        
+
         // Remove 0x prefix if present
         if (privateKey.StartsWith("0x"))
             privateKey = privateKey[2..];
-            
+
         _account = new Account(privateKey);
         _web3 = new Web3(_account, config.RpcUrl);
-        
+
         // Initialize contracts
         _contract = _web3.Eth.GetContract(ContractAbis.AcpAbi, config.ContractAddress);
         _tokenContract = _web3.Eth.GetContract(ContractAbis.Erc20Abi, config.PaymentTokenAddress);
@@ -62,22 +63,22 @@ public class NethereumBlockchainClient : IDisposable
         try
         {
             var expireTimestamp = new BigInteger(((DateTimeOffset)expiredAt).ToUnixTimeSeconds());
-            
+
             var function = _contract.GetFunction("createJob");
-            
+
             // Estimate gas for the transaction
             var gasEstimate = await function.EstimateGasAsync(
                 providerAddress,
                 evaluatorAddress,
                 expireTimestamp
             );
-            
+
             // Add 20% buffer to the gas estimate
             var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
-            
-            _logger?.LogInformation("Estimated gas for createJob: {GasEstimate}, using gas limit: {GasLimit}", 
+
+            _logger?.LogInformation("Estimated gas for createJob: {GasEstimate}, using gas limit: {GasLimit}",
                 gasEstimate.Value, gasLimit);
-            
+
             var txHash = await function.SendTransactionAsync(
                 _account.Address,
                 gasLimit.ToHexBigInteger(),
@@ -102,20 +103,23 @@ public class NethereumBlockchainClient : IDisposable
         try
         {
             var formattedAmount = FormatAmount(amount);
-            
+
             var function = _tokenContract.GetFunction("approve");
-            
+
             // Estimate gas for the transaction
             var gasEstimate = await function.EstimateGasAsync(
+                 _account.Address,
+                new HexBigInteger(0),
+                new HexBigInteger(0),
                 formattedAmount
             );
-            
+
             // Add 20% buffer to the gas estimate
             var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
-            
-            _logger?.LogInformation("Estimated gas for approve: {GasEstimate}, using gas limit: {GasLimit}", 
+
+            _logger?.LogInformation("Estimated gas for approve: {GasEstimate}, using gas limit: {GasLimit}",
                 gasEstimate.Value, gasLimit);
-            
+
             var txHash = await function.SendTransactionAsync(
                 _account.Address,
                 gasLimit.ToHexBigInteger(),
@@ -139,12 +143,24 @@ public class NethereumBlockchainClient : IDisposable
         string content,
         MemoType memoType,
         bool isSecured,
-        AcpJobPhase nextPhase)
+        AcpJobPhase nextPhase,
+        bool useSmartContractSigning = false)
     {
         try
         {
             var function = _contract.GetFunction("createMemo");
-            
+
+            // Check if smart contract signing is requested and signer address is available
+            if (useSmartContractSigning && !string.IsNullOrEmpty(_signerAddress))
+            {
+                var callData = function.GetData(jobId,
+                content,
+                (int)memoType,
+                isSecured,
+                (int)nextPhase);
+                return await SignWithSmartContractAsync(_signerAddress, callData);
+            }
+
             // Estimate gas for the transaction
             // need from else this throws in sc
             var gasEstimate = await function.EstimateGasAsync(
@@ -157,13 +173,13 @@ public class NethereumBlockchainClient : IDisposable
                 isSecured,
                 (int)nextPhase
             );
-            
+
             // Add 20% buffer to the gas estimate
             var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
-            
-            _logger?.LogInformation("Estimated gas for createMemo: {GasEstimate}, using gas limit: {GasLimit}", 
+
+            _logger?.LogInformation("Estimated gas for createMemo: {GasEstimate}, using gas limit: {GasLimit}",
                 gasEstimate.Value, gasLimit);
-            
+
             var txHash = await function.SendTransactionAsync(
                 _account.Address,
                 gasLimit.ToHexBigInteger(),
@@ -203,9 +219,9 @@ public class NethereumBlockchainClient : IDisposable
             var formattedAmount = FormatAmount(amount);
             var formattedFeeAmount = FormatAmount(feeAmount);
             var expireTimestamp = new BigInteger(((DateTimeOffset)expiredAt).ToUnixTimeSeconds());
-            
+
             var function = _contract.GetFunction("createPayableMemo");
-            
+
             // Estimate gas for the transaction
             var gasEstimate = await function.EstimateGasAsync(
                 jobId,
@@ -219,13 +235,13 @@ public class NethereumBlockchainClient : IDisposable
                 (int)nextPhase,
                 expireTimestamp
             );
-            
+
             // Add 20% buffer to the gas estimate
             var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
-            
-            _logger?.LogInformation("Estimated gas for createPayableMemo: {GasEstimate}, using gas limit: {GasLimit}", 
+
+            _logger?.LogInformation("Estimated gas for createPayableMemo: {GasEstimate}, using gas limit: {GasLimit}",
                 gasEstimate.Value, gasLimit);
-            
+
             var txHash = await function.SendTransactionAsync(
                 _account.Address,
                 gasLimit.ToHexBigInteger(),
@@ -255,16 +271,17 @@ public class NethereumBlockchainClient : IDisposable
     public async Task<string> SignMemoAsync(int memoId, bool isApproved, string reason = "", bool useSmartContractSigning = false)
     {
         try
-        {
+        {           
+
+            var function = _contract.GetFunction("signMemo");
+
             // Check if smart contract signing is requested and signer address is available
             if (useSmartContractSigning && !string.IsNullOrEmpty(_signerAddress))
             {
-                return await SignMemoWithSmartContractAsync(memoId, isApproved, reason);
+                var callData = function.GetData(memoId, isApproved, reason);
+                return await SignWithSmartContractAsync(_signerAddress, callData);
             }
 
-            // Original direct contract call
-            var function = _contract.GetFunction("signMemo");
-            
             // Estimate gas for the transaction
             var gasEstimate = await function.EstimateGasAsync(
                 _account.Address,
@@ -274,13 +291,13 @@ public class NethereumBlockchainClient : IDisposable
                 isApproved,
                 reason
             );
-            
+
             // Add 20% buffer to the gas estimate
             var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
-            
-            _logger?.LogInformation("Estimated gas for signMemo: {GasEstimate}, using gas limit: {GasLimit}", 
+
+            _logger?.LogInformation("Estimated gas for signMemo: {GasEstimate}, using gas limit: {GasLimit}",
                 gasEstimate.Value, gasLimit);
-            
+
             var txHash = await function.SendTransactionAsync(
                 _account.Address,
                 gasLimit.ToHexBigInteger(),
@@ -298,64 +315,28 @@ public class NethereumBlockchainClient : IDisposable
             _logger?.LogError(ex, "Failed to sign memo");
             throw new AcpContractError("Failed to sign memo", ex);
         }
-    }
-
-    /// <summary>
-    /// Signs a memo using smart contract signing instead of direct contract calls.
-    /// This method prepares the signMemo call data and executes it through the smart contract.
-    /// </summary>
-    /// <param name="memoId">The ID of the memo to sign</param>
-    /// <param name="isApproved">Whether the memo is approved</param>
-    /// <param name="reason">The reason for signing</param>
-    /// <returns>The transaction hash</returns>
-    private async Task<string> SignMemoWithSmartContractAsync(int memoId, bool isApproved, string reason = "")
-    {
-        try
-        {
-            var smartContractAddress = _signerAddress!;
-            
-            _logger?.LogInformation("Signing memo with smart contract: {SmartContractAddress}, MemoId: {MemoId}", 
-                smartContractAddress, memoId);
-
-            // Get the signMemo function to encode the call data
-            var signMemoFunction = _contract.GetFunction("signMemo");
-            
-            // Encode the function call data
-            var callData = signMemoFunction.GetData(memoId, isApproved, reason);
-
-            // Use smart contract to execute the signMemo call
-            var txHash = await SignWithSmartContractAsync(smartContractAddress, callData);          
-
-            _logger?.LogInformation("Memo signed with smart contract. Transaction hash: {TxHash}", txHash);
-            return txHash;
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Failed to sign memo with smart contract");
-            throw new AcpContractError("Failed to sign memo with smart contract", ex);
-        }
-    }
+    }   
 
     public async Task<string> SetBudgetAsync(int jobId, double budget)
     {
         try
         {
             var formattedBudget = FormatAmount(budget);
-            
+
             var function = _contract.GetFunction("setBudget");
-            
+
             // Estimate gas for the transaction
             var gasEstimate = await function.EstimateGasAsync(
                 jobId,
                 formattedBudget
             );
-            
+
             // Add 20% buffer to the gas estimate
             var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
-            
-            _logger?.LogInformation("Estimated gas for setBudget: {GasEstimate}, using gas limit: {GasLimit}", 
+
+            _logger?.LogInformation("Estimated gas for setBudget: {GasEstimate}, using gas limit: {GasLimit}",
                 gasEstimate.Value, gasLimit);
-            
+
             var txHash = await function.SendTransactionAsync(
                 _account.Address,
                 gasLimit.ToHexBigInteger(),
@@ -380,9 +361,9 @@ public class NethereumBlockchainClient : IDisposable
         {
             var formattedBudget = FormatAmount(budget);
             var tokenAddress = paymentTokenAddress ?? _config.PaymentTokenAddress;
-            
+
             var function = _contract.GetFunction("setBudgetWithPaymentToken");
-            
+
             // Estimate gas for the transaction
             // need to add from here, else msg_sender is wrong and this throws in the contract
             var gasEstimate = await function.EstimateGasAsync(
@@ -393,13 +374,13 @@ public class NethereumBlockchainClient : IDisposable
                 formattedBudget,
                 tokenAddress
             );
-            
+
             // Add 20% buffer to the gas estimate
             var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
-            
-            _logger?.LogInformation("Estimated gas for setBudgetWithPaymentToken: {GasEstimate}, using gas limit: {GasLimit}", 
+
+            _logger?.LogInformation("Estimated gas for setBudgetWithPaymentToken: {GasEstimate}, using gas limit: {GasLimit}",
                 gasEstimate.Value, gasLimit);
-            
+
             var txHash = await function.SendTransactionAsync(
                 _account.Address,
                 gasLimit.ToHexBigInteger(),
@@ -438,13 +419,13 @@ public class NethereumBlockchainClient : IDisposable
         try
         {
             var receipt = await _web3.Eth.TransactionManager.TransactionReceiptService.PollForReceiptAsync(txHash);
-            
+
             if (receipt.Status.Value != 1)
                 throw new TransactionFailedError($"Transaction failed: {txHash}");
 
             // Get the transaction to access the return data
             var transaction = await _web3.Eth.Transactions.GetTransactionByHash.SendRequestAsync(txHash);
-            
+
             if (transaction == null)
                 throw new AcpContractError($"Transaction not found: {txHash}");
 
@@ -455,7 +436,7 @@ public class NethereumBlockchainClient : IDisposable
             cleanHex = cleanHex.TrimStart('0');
             if (string.IsNullOrEmpty(cleanHex)) cleanHex = "0";
             var jobId = BigInteger.Parse(cleanHex, System.Globalization.NumberStyles.HexNumber);
-            
+
             _logger?.LogInformation("Job ID extracted from transaction data: {JobId}", jobId);
             return jobId;
         }
@@ -468,52 +449,31 @@ public class NethereumBlockchainClient : IDisposable
 
     /// <summary>
     /// Signs a message using a smart contract that implements EIP-1271 signature validation.
-    /// The smart contract must be deployed using SemiModularAccountBytecode and the account must be whitelisted.
+    /// The smart contract must be deployed using ERC6900 and the account must be whitelisted.
     /// </summary>
     /// <param name="smartContractAddress">The address of the smart contract that will sign the message</param>
     /// <param name="message">The message to be signed</param>
     /// <returns>The signature hash that can be validated using EIP-1271</returns>
     public async Task<string> SignWithSmartContractAsync(
-        string smartContractAddress, 
-        string message)
+        string smartContractAddress,
+        string encodedData)
     {
         try
         {
-            // Create the message hash using Ethereum's personal message signing format
-            var messageBytes = System.Text.Encoding.UTF8.GetBytes(message);
-            var ethMessage = $"\x19Ethereum Signed Message:\n{messageBytes.Length}{message}";
-            var messageHash = new Sha3Keccack().CalculateHash(System.Text.Encoding.UTF8.GetBytes(ethMessage));
-            
             _logger?.LogInformation("Signing message with smart contract: {SmartContractAddress}", smartContractAddress);
-            
-            // For SemiModularAccount, we need to call the execute function with the signature data
+
+            // For ERC6900, we need to call the execute function with the signature data
             // This assumes the smart contract has been deployed and configured properly
-            var contract = _web3.Eth.GetContract(ContractAbis.SemiModularAccountAbi, smartContractAddress);
+            var contract = _web3.Eth.GetContract(ContractAbis.ERC6900Abi, smartContractAddress);
             var executeFunction = contract.GetFunction("execute");
-            
-            // Prepare the signature data - this will be handled by the smart contract's signing mechanism
-            var signatureData = messageHash.ToHex(true);
-            
-            // Estimate gas for the transaction
-            var gasEstimate = await executeFunction.EstimateGasAsync(
-                _account.Address,
-                new HexBigInteger(0),
-                new HexBigInteger(0),
-                signatureData
-            );
-            
-            // Add 20% buffer to the gas estimate
-            var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
-            
-            _logger?.LogInformation("Estimated gas for smart contract signing: {GasEstimate}, using gas limit: {GasLimit}", 
-                gasEstimate.Value, gasLimit);
-            
-            var txHash = await executeFunction.SendTransactionAsync(
-                _account.Address,
-                gasLimit.ToHexBigInteger(),
-                new BigInteger(0).ToHexBigInteger(),
-                signatureData
-            );
+
+            var txHash = await executeFunction.SendTransactionAsync(_account.Address, 
+                new HexBigInteger(200000), // todo estimate this
+                new HexBigInteger(0), 
+                _contract.Address, // target contract
+                    0, // value
+                 encodedData.HexToByteArray()
+                );
 
             _logger?.LogInformation("Smart contract signing transaction sent: {TxHash}", txHash);
             return txHash;
@@ -533,28 +493,28 @@ public class NethereumBlockchainClient : IDisposable
     /// <param name="signature">The signature to validate</param>
     /// <returns>True if the signature is valid according to EIP-1271, false otherwise</returns>
     public async Task<bool> ValidateSmartContractSignatureAsync(
-        string smartContractAddress, 
-        string messageHash, 
+        string smartContractAddress,
+        string messageHash,
         string signature)
     {
         try
         {
             var contract = _web3.Eth.GetContract(ContractAbis.Eip1271Abi, smartContractAddress);
             var isValidSignatureFunction = contract.GetFunction("isValidSignature");
-            
+
             // Call the EIP-1271 isValidSignature function
             var result = await isValidSignatureFunction.CallAsync<byte[]>(
                 messageHash.HexToByteArray(),
                 signature.HexToByteArray()
             );
-            
+
             // EIP-1271 returns 0x1626ba7e for valid signatures
             var validSignatureMagicValue = "0x1626ba7e";
             var isValid = result.ToHex(true).ToLower() == validSignatureMagicValue.ToLower();
-            
-            _logger?.LogInformation("Smart contract signature validation result: {IsValid} for contract: {ContractAddress}", 
+
+            _logger?.LogInformation("Smart contract signature validation result: {IsValid} for contract: {ContractAddress}",
                 isValid, smartContractAddress);
-            
+
             return isValid;
         }
         catch (Exception ex)
@@ -564,7 +524,7 @@ public class NethereumBlockchainClient : IDisposable
         }
     }
 
-  
+
     public void Dispose()
     {
         // Web3 doesn't implement IDisposable, so nothing to dispose

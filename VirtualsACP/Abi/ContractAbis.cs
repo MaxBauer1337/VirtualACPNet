@@ -687,4 +687,18 @@ public static class ContractAbis
     ""type"": ""function""
   }
 ]";
+
+    public static readonly string ERC6900Abi = @"[
+            {
+                ""constant"": false,
+                ""inputs"": [
+                    { ""name"": ""to"", ""type"": ""address"" },
+                    { ""name"": ""value"", ""type"": ""uint256"" },
+                    { ""name"": ""data"", ""type"": ""bytes"" }
+                ],
+                ""name"": ""execute"",
+                ""outputs"": [],
+                ""type"": ""function""
+            }
+        ]";
 }

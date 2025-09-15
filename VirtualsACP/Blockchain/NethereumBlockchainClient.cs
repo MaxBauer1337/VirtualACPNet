@@ -467,12 +467,21 @@ public class NethereumBlockchainClient : IDisposable
             var contract = _web3.Eth.GetContract(ContractAbis.ERC6900Abi, smartContractAddress);
             var executeFunction = contract.GetFunction("execute");
 
-            var txHash = await executeFunction.SendTransactionAsync(_account.Address, 
-                new HexBigInteger(200000), // todo estimate this
+            var data = encodedData.HexToByteArray();
+            var gas = await executeFunction.EstimateGasAsync(_account.Address,
+                new HexBigInteger(0),
+                new HexBigInteger(0),
+                _contract.Address, // target contract
+                    0, // value
+                 data);
+
+            var txHash = await executeFunction.SendTransactionAsync(
+                _account.Address,
+                gas,
                 new HexBigInteger(0), 
                 _contract.Address, // target contract
                     0, // value
-                 encodedData.HexToByteArray()
+                data
                 );
 
             _logger?.LogInformation("Smart contract signing transaction sent: {TxHash}", txHash);

@@ -111,6 +111,7 @@ public class NethereumBlockchainClient : IDisposable
                  _account.Address,
                 new HexBigInteger(0),
                 new HexBigInteger(0),
+                _config.ContractAddress,
                 formattedAmount
             );
 

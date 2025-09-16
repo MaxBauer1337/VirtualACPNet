@@ -100,7 +100,7 @@ public class VirtualsACPClient : IDisposable
                 : null;
 
             var context = jobData.TryGetValue("context", out var contextValue)
-                ? JsonSerializer.Deserialize<Dictionary<string, object>>(contextValue.ToString() ?? "{}")
+                ? JsonSerializer.Deserialize<Dictionary<string, object>>(contextValue?.ToString() ?? "{}")
                 : null;
 
             var job = new ACPJob

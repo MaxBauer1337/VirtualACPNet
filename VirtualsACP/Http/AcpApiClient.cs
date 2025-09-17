@@ -231,32 +231,7 @@ public class AcpApiClient : IDisposable
             _logger?.LogError(ex, "Unexpected error while getting agent {WalletAddress}", walletAddress);
             throw new AcpError("An unexpected error occurred while getting agent", ex);
         }
-    }
-
-    public async Task CreateJobAsync(object jobData)
-    {
-        try
-        {
-            var url = _baseUrl;
-            var json = JsonSerializer.Serialize(jobData);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            _logger?.LogDebug("Making POST request to: {Url} with data: {Data}", url, json);
-
-            var response = await _httpClient.PostAsync(url, content);
-            response.EnsureSuccessStatusCode();
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger?.LogError(ex, "HTTP error while creating job");
-            throw new AcpApiError("Failed to create job", ex);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Unexpected error while creating job");
-            throw new AcpError("An unexpected error occurred while creating job", ex);
-        }
-    }
+    }   
 
     public void Dispose()
     {

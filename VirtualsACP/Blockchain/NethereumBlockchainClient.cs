@@ -86,7 +86,12 @@ public class NethereumBlockchainClient : IDisposable
             var callData = function.GetData(inputs);
             return await SignWithSmartContractAsync(callData);
         }
+        return await EstimateGasAndSendDirect(function, inputs);
 
+    }
+
+    private async Task<string> EstimateGasAndSendDirect(Function function, params object[] inputs)
+    {
         // Estimate gas for the transaction
         var gasEstimate = await function.EstimateGasAsync(_account.Address, new HexBigInteger(0), new HexBigInteger(0), inputs);
 
@@ -107,6 +112,7 @@ public class NethereumBlockchainClient : IDisposable
 
         return receipt.TransactionHash;
     }
+
 
     public async Task<string> ApproveAllowanceAsync(decimal amount)
     {
@@ -296,12 +302,12 @@ public class NethereumBlockchainClient : IDisposable
             var executeFunction = contract.GetFunction("execute");
 
             var data = encodedData.HexToByteArray();
+
+            var inParams = new object[] { _contract.Address, 0, data };
             var gas = await executeFunction.EstimateGasAsync(_account.Address,
                 new HexBigInteger(0),
                 new HexBigInteger(0),
-                _contract.Address, // target contract
-                    0, // value
-                 data);
+                inParams);
 
             var cts = new CancellationTokenSource();
             var txHash = await executeFunction.SendTransactionAndWaitForReceiptAsync(
@@ -309,9 +315,7 @@ public class NethereumBlockchainClient : IDisposable
                 gas,
                 new HexBigInteger(0),
                 cts.Token,
-                _contract.Address, // target contract
-                0, // value
-                data
+                inParams
                 );
 
             _logger?.LogInformation("Smart contract signing transaction sent: {TxHash}", txHash);

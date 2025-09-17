@@ -134,24 +134,6 @@ Found 2 active jobs
   Phase: Negotiation
 ```
 
-## Troubleshooting
-
-### Common Issues
-
-1. **"Invalid private key"**: Make sure your private key is valid and starts with or without "0x"
-2. **"Connection failed"**: Check your internet connection and RPC URL
-3. **"No agents found"**: The search might not return results on testnet
-4. **"Transaction failed"**: Ensure you have sufficient funds and gas
-
-### Debug Mode
-
-To see more detailed logging, modify the logger configuration in the examples:
-
-```csharp
-var loggerFactory = LoggerFactory.Create(builder => 
-    builder.AddConsole().SetMinimumLevel(LogLevel.Debug));
-```
-
 ## Contributing
 
 Feel free to add more examples or improve existing ones. When adding new examples:
@@ -161,7 +143,3 @@ Feel free to add more examples or improve existing ones. When adding new example
 3. Include proper error handling and logging
 4. Update the main `Program.cs` to include your example
 5. Add documentation to this README
-
-## License
-
-This examples project follows the same license as the main VirtualsACP SDK.

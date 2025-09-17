@@ -1,77 +1,16 @@
 # VirtualsACP C# SDK
 
-A C# SDK for the Virtuals Agent Contract Protocol (ACP), converted from the original Python implementation.
+A C# SDK for the Virtuals Agent Contract Protocol (ACP), converted from the original Python/NodeJs implementation.
 
 ## Features
 
 - **Blockchain Integration**: Uses Nethereum for Ethereum blockchain interactions
-- **WebSocket Support**: Real-time communication using ASP.NET Core SignalR
+- **SocketIO Support**: Real-time communication using SocketIO
 - **REST API Client**: HTTP client for ACP API interactions
 - **Type Safety**: Strongly typed models and enums
 - **Async/Await**: Full async support throughout the SDK
 - **Logging**: Built-in logging support with Microsoft.Extensions.Logging
 
-## Project Structure
-
-```
-VirtualsAcp/
-├── Models/                 # Data models and enums
-│   ├── Enums.cs           # All enumeration types
-│   ├── IDeliverable.cs    # Deliverable interface
-│   ├── IACPAgent.cs       # Agent model
-│   ├── ACPJob.cs          # Job model
-│   ├── ACPMemo.cs         # Memo model
-│   ├── ACPJobOffering.cs  # Job offering model
-│   └── PayloadModels.cs   # Payload models for different operations
-├── Configs/               # Configuration classes
-│   ├── AcpContractConfig.cs # Contract configuration
-│   └── EnvSettings.cs     # Environment settings
-├── Exceptions/            # Custom exceptions
-│   └── AcpExceptions.cs   # ACP-specific exceptions
-├── Blockchain/            # Blockchain integration
-│   └── NethereumBlockchainClient.cs # Nethereum-based client
-├── Utils/                 # Utility classes
-│   ├── JsonUtils.cs       # JSON parsing utilities
-│   └── DateTimeExtensions.cs # DateTime extensions
-├── Abi/                   # Contract ABIs
-│   └── ContractAbis.cs    # ACP and ERC20 contract ABIs
-├── WebSocket/             # WebSocket communication
-│   └── SignalRClient.cs   # SignalR client implementation
-├── Http/                  # HTTP client
-│   └── AcpApiClient.cs    # REST API client
-├── Examples/              # Example usage
-│   └── Program.cs         # Example program
-├── VirtualsACPClient.cs   # Main client class
-├── VirtualsAcp.cs         # Namespace and version info
-└── VirtualsAcp.csproj     # Project file
-```
-
-## Key Differences from Python Version
-
-### 1. **Blockchain Client**
-- **Python**: Used Alchemy SDK for blockchain interactions
-- **C#**: Uses Nethereum library for direct Ethereum integration
-- **Benefits**: More control, better performance, no external dependencies
-
-### 2. **WebSocket Communication**
-- **Python**: Used socketio-client
-- **C#**: Uses ASP.NET Core SignalR
-- **Benefits**: Better integration with .NET ecosystem, automatic reconnection
-
-### 3. **HTTP Client**
-- **Python**: Used requests library
-- **C#**: Uses HttpClient with proper async patterns
-- **Benefits**: Better resource management, built-in retry policies
-
-### 4. **Data Models**
-- **Python**: Used Pydantic for validation
-- **C#**: Uses System.Text.Json with JsonPropertyName attributes
-- **Benefits**: Better performance, native .NET serialization
-
-### 5. **Configuration**
-- **Python**: Used dataclasses and environment variables
-- **C#**: Uses classes with properties and environment variable parsing
-- **Benefits**: Type safety, better IDE support
 
 ## Usage Example
 
@@ -88,7 +27,7 @@ var logger = loggerFactory.CreateLogger<VirtualsACPClient>();
 var client = new VirtualsACPClient(
     walletPrivateKey: "your_private_key_here",
     entityId: 12345,
-    agentWalletAddress: "0x...", // optional
+    agentWalletAddress: "0x...", 
     config: Configurations.BaseSepoliaConfig, // or DefaultConfig
     onNewTask: async (job, memoToSign) => {
         Console.WriteLine($"New task received: {job.Id}");
@@ -119,17 +58,6 @@ var activeJobs = await client.GetActiveJobsAsync(page: 1, pageSize: 10);
 // Don't forget to dispose
 client.Dispose();
 ```
-
-## Dependencies
-
-- **.NET 9.0**: Target framework
-- **Nethereum**: Ethereum blockchain integration
-- **Microsoft.AspNetCore.SignalR.Client**: WebSocket communication
-- **System.Text.Json**: JSON serialization
-- **Newtonsoft.Json**: Additional JSON utilities
-- **Microsoft.Extensions.Logging**: Logging framework
-- **Microsoft.Extensions.Http**: HTTP client extensions
-- **Microsoft.Extensions.DependencyInjection**: Dependency injection
 
 ## Configuration
 
@@ -202,17 +130,3 @@ dotnet test
 # Create NuGet package
 dotnet pack
 ```
-
-## Migration from Python
-
-If you're migrating from the Python version:
-
-1. **Async/Await**: All methods are now async and return `Task` or `Task<T>`
-2. **Disposal**: Remember to call `Dispose()` on the client when done
-3. **Event Handlers**: Use C# delegates instead of Python callbacks
-4. **Configuration**: Use the `Configurations` class instead of importing configs
-5. **Error Handling**: Use specific exception types instead of generic exceptions
-
-## License
-
-This project maintains the same license as the original Python implementation.

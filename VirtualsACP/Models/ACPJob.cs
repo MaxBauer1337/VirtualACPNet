@@ -43,24 +43,7 @@ public class ACPJob
                $")";
     }
 
-    public string? ServiceRequirement
-    {
-        get
-        {
-            var memo = Memos.FirstOrDefault(m => m.NextPhase == AcpJobPhase.Negotiation);
-            if (memo?.Content == null) return null;
-
-            try
-            {
-                var contentObj = JsonSerializer.Deserialize<NegotiationPayload>(memo.Content);
-                return contentObj?.ServiceRequirement?.ToString();
-            }
-            catch
-            {
-                return null;
-            }
-        }
-    }
+    
 
     public string? ServiceName
     {
@@ -81,82 +64,10 @@ public class ACPJob
         }
     }
 
-    public string? Deliverable
-    {
-        get
-        {
-            var memo = Memos.FirstOrDefault(m => m.NextPhase == AcpJobPhase.Completed);
-            return memo?.Content;
-        }
-    }
-
-    public async Task<IACPAgent?> GetProviderAgentAsync()
-    {
-        return AcpClient != null ? await AcpClient.GetAgentAsync(ProviderAddress) : null;
-    }
-
-    public async Task<IACPAgent?> GetClientAgentAsync()
-    {
-        return AcpClient != null ? await AcpClient.GetAgentAsync(ClientAddress) : null;
-    }
-
-    public async Task<IACPAgent?> GetEvaluatorAgentAsync()
-    {
-        return AcpClient != null ? await AcpClient.GetAgentAsync(EvaluatorAddress) : null;
-    }
-
     public ACPMemo? LatestMemo => Memos.LastOrDefault();
 
     private ACPMemo? GetMemoById(int memoId)
     {
         return Memos.FirstOrDefault(m => m.Id == memoId);
-    }
-
-    public async Task<Dictionary<string, object>> PayAsync(double amount, string? reason = null)
-    {
-        var memo = Memos.FirstOrDefault(m => m.NextPhase == AcpJobPhase.Transaction);
-        if (memo == null)
-            throw new InvalidOperationException("No transaction memo found");
-
-        reason ??= $"Job {Id} paid";
-
-        return await AcpClient!.PayJobAsync(Id, memo.Id, amount, reason);
-    }
-
-    public async Task<string> RespondAsync(bool accept, GenericPayload? payload = null, string? reason = null)
-    {
-        if (LatestMemo == null || LatestMemo.NextPhase != AcpJobPhase.Negotiation)
-            throw new InvalidOperationException("No negotiation memo found");
-
-        reason ??= $"Job {Id} {(accept ? "accepted" : "rejected")}";
-
-        return await AcpClient!.RespondToJobAsync(
-            Id,
-            LatestMemo.Id,
-            accept,
-            payload != null ? JsonSerializer.Serialize(payload) : null,
-            reason
-        );
-    }
-
-    public async Task<string> DeliverAsync(IDeliverable deliverable)
-    {
-        if (LatestMemo == null || LatestMemo.NextPhase != AcpJobPhase.Evaluation)
-            throw new InvalidOperationException("No transaction memo found");
-
-        return await AcpClient!.DeliverJobAsync(Id, deliverable);
-    }
-
-    public async Task<string> EvaluateAsync(bool accept, string? reason = null)
-    {
-        if (LatestMemo == null || LatestMemo.NextPhase != AcpJobPhase.Completed)
-            throw new InvalidOperationException("No evaluation memo found");
-
-        reason ??= $"Job {Id} delivery {(accept ? "accepted" : "rejected")}";
-
-        return await AcpClient!.SignMemoAsync(LatestMemo.Id, accept, reason);
-    }
-
-    // Additional methods for position management would go here
-    // (open_position, respond_open_position, etc.)
+    }    
 }

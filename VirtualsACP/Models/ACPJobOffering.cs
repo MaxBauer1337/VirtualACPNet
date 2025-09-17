@@ -35,52 +35,5 @@ public class ACPJobOffering
         };
 
         return $"ACPJobOffering({JsonSerializer.Serialize(properties)})";
-    }
-
-    public async Task<int> InitiateJobAsync(
-        object serviceRequirement,
-        string? evaluatorAddress = null,
-        DateTime? expiredAt = null)
-    {
-        // Validate against requirement schema if present
-        if (RequirementSchema != null)
-        {
-            try
-            {
-                var json = JsonSerializer.Serialize(serviceRequirement);
-                var requirementDict = JsonSerializer.Deserialize<Dictionary<string, object>>(json);
-                
-                // Basic validation - in a real implementation, you'd use a proper JSON schema validator
-                // For now, we'll just ensure it's valid JSON
-                if (requirementDict == null)
-                    throw new ArgumentException($"Invalid JSON in service requirement. Required format: {JsonSerializer.Serialize(RequirementSchema, new JsonSerializerOptions { WriteIndented = true })}");
-            }
-            catch (JsonException ex)
-            {
-                throw new ArgumentException($"Invalid JSON in service requirement. Required format: {JsonSerializer.Serialize(RequirementSchema, new JsonSerializerOptions { WriteIndented = true })}", ex);
-            }
-        }
-
-        var finalServiceRequirement = new Dictionary<string, object>
-        {
-            ["name"] = Name
-        };
-
-        if (serviceRequirement is string str)
-        {
-            finalServiceRequirement["message"] = str;
-        }
-        else
-        {
-            finalServiceRequirement["serviceRequirement"] = serviceRequirement;
-        }
-
-        return await AcpClient!.InitiateJobAsync(
-            ProviderAddress,
-            finalServiceRequirement,
-            Price,
-            evaluatorAddress,
-            expiredAt
-        );
-    }
+    }  
 }

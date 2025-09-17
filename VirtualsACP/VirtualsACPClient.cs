@@ -12,7 +12,7 @@ public class VirtualsACPClient : IDisposable
 {
     private readonly NethereumBlockchainClient _blockchainClient;
     private readonly AcpApiClient _apiClient;
-    private readonly ACPSocketIO? _signalRClient;
+    private readonly ACPSocketIO? socketClient;
     private readonly ILogger? _logger;
     private readonly AcpContractConfig _config;
     private readonly string _agentAddress;
@@ -44,9 +44,9 @@ public class VirtualsACPClient : IDisposable
         // Initialize SignalR client if callbacks are provided
         if (onNewTask != null || onEvaluate != null)
         {
-            _signalRClient = new ACPSocketIO(_config.AcpApiUrl, logger, _agentAddress);
-            _signalRClient.OnNewTask += HandleNewTaskAsync;
-            _signalRClient.OnEvaluate += HandleEvaluateAsync;
+            socketClient = new ACPSocketIO(_config.AcpApiUrl, logger, _agentAddress);
+            socketClient.OnNewTask += HandleNewTaskAsync;
+            socketClient.OnEvaluate += HandleEvaluateAsync;
             OnNewTask = onNewTask;
             OnEvaluate = onEvaluate;
         }
@@ -57,17 +57,17 @@ public class VirtualsACPClient : IDisposable
 
     public async Task StartAsync()
     {
-        if (_signalRClient != null)
+        if (socketClient != null)
         {
-            await _signalRClient.StartAsync(_agentAddress);
+            await socketClient.StartAsync(_agentAddress);
         }
     }
 
     public async Task StopAsync()
     {
-        if (_signalRClient != null)
+        if (socketClient != null)
         {
-            await _signalRClient.StopAsync();
+            await socketClient.StopAsync();
         }
     }
 
@@ -487,6 +487,6 @@ public class VirtualsACPClient : IDisposable
     {
         _blockchainClient?.Dispose();
         _apiClient?.Dispose();
-        _signalRClient?.Dispose();
+        socketClient?.Dispose();
     }
 }

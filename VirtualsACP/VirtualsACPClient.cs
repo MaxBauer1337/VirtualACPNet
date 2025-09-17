@@ -217,15 +217,11 @@ public class VirtualsACPClient : IDisposable
         // Create job on blockchain
         var txHash = await _blockchainClient.CreateJobAsync(providerAddress, evalAddr, expiredAt.Value);
 
-        // Wait for transaction to be mined and get job ID
-        await Task.Delay(3000); // Wait 3 seconds for transaction to be mined
-
         var jobId = await _blockchainClient.GetJobIdFromTransactionAsync(txHash);
 
         // Set budget
         await _blockchainClient.SetBudgetWithPaymentTokenAsync((int)jobId, amount);
-        await Task.Delay(3000);
-
+        
         // Create initial memo
         var memoContent = serviceRequirement is string str
             ? str
@@ -267,12 +263,10 @@ public class VirtualsACPClient : IDisposable
     {
         try
         {
-            var txHash = await _blockchainClient.SignMemoAsync(memoId, accept, reason ?? "", true);
+            var txHash = await _blockchainClient.SignMemoAsync(memoId, accept, reason ?? "");
 
             if (!accept)
                 return txHash;
-
-            await Task.Delay(10000); // Wait 10 seconds
 
             _logger?.LogInformation("Responding to job {JobId} with memo {MemoId} and accept {Accept} and reason {Reason}",
                 jobId, memoId, accept, reason);
@@ -282,8 +276,7 @@ public class VirtualsACPClient : IDisposable
                 content ?? $"Job {jobId} accepted. {reason ?? ""}",
                 MemoType.Message,
                 false,
-                AcpJobPhase.Transaction,
-                useSmartContractSigning: true
+                AcpJobPhase.Transaction
             );
 
             _logger?.LogInformation("Responded to job {JobId} with memo {MemoId} and accept {Accept} and reason {Reason}",
@@ -438,8 +431,7 @@ public class VirtualsACPClient : IDisposable
             deliverableJson,
             MemoType.ObjectUrl,
             true,
-            AcpJobPhase.Completed,
-            useSmartContractSigning : true
+            AcpJobPhase.Completed
         );
 
         return txHash;

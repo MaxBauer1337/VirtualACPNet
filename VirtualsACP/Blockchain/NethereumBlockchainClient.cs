@@ -10,6 +10,7 @@ using Nethereum.Web3;
 using Nethereum.Web3.Accounts;
 using System;
 using System.Numerics;
+using System.Security.AccessControl;
 using VirtualsAcp.Abi;
 using VirtualsAcp.Configs;
 using VirtualsAcp.Exceptions;
@@ -65,27 +66,7 @@ public class NethereumBlockchainClient : IDisposable
 
             var function = _contract.GetFunction("createJob");
 
-            // Estimate gas for the transaction
-            var gasEstimate = await function.EstimateGasAsync(
-                providerAddress,
-                evaluatorAddress,
-                expireTimestamp
-            );
-
-            // Add 20% buffer to the gas estimate
-            var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
-
-            _logger?.LogInformation("Estimated gas for createJob: {GasEstimate}, using gas limit: {GasLimit}",
-                gasEstimate.Value, gasLimit);
-
-            var txHash = await function.SendTransactionAsync(
-                _account.Address,
-                gasLimit.ToHexBigInteger(),
-                new BigInteger(0).ToHexBigInteger(), // gasPrice - let Nethereum handle this
-                providerAddress,
-                evaluatorAddress,
-                expireTimestamp
-            );
+            string txHash = await EstimateGasAndSend(function, providerAddress, evaluatorAddress, expireTimestamp);
 
             _logger?.LogInformation("Job creation transaction sent: {TxHash}", txHash);
             return txHash;
@@ -97,6 +78,36 @@ public class NethereumBlockchainClient : IDisposable
         }
     }
 
+    private async Task<string> EstimateGasAndSend(Function function, params object[] inputs)
+    {
+        // check if signer
+        if (!string.IsNullOrEmpty(_signerAddress))
+        {
+            var callData = function.GetData(inputs);
+            return await SignWithSmartContractAsync(callData);
+        }
+
+        // Estimate gas for the transaction
+        var gasEstimate = await function.EstimateGasAsync(_account.Address, new HexBigInteger(0), new HexBigInteger(0), inputs);
+
+        // Add 20% buffer to the gas estimate
+        var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
+
+        _logger?.LogInformation("Estimated gas for createJob: {GasEstimate}, using gas limit: {GasLimit}",
+            gasEstimate.Value, gasLimit);
+
+        var cts = new CancellationTokenSource();
+        var receipt = await function.SendTransactionAndWaitForReceiptAsync(
+            _account.Address,
+            gasLimit.ToHexBigInteger(),
+            BigInteger.Zero.ToHexBigInteger(), // gasPrice - let Nethereum handle this
+            cts.Token,
+            inputs
+        );
+
+        return receipt.TransactionHash;
+    }
+
     public async Task<string> ApproveAllowanceAsync(decimal amount)
     {
         try
@@ -105,28 +116,7 @@ public class NethereumBlockchainClient : IDisposable
 
             var function = _tokenContract.GetFunction("approve");
 
-            // Estimate gas for the transaction
-            var gasEstimate = await function.EstimateGasAsync(
-                 _account.Address,
-                new HexBigInteger(0),
-                new HexBigInteger(0),
-                _config.ContractAddress,
-                formattedAmount
-            );
-
-            // Add 20% buffer to the gas estimate
-            var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
-
-            _logger?.LogInformation("Estimated gas for approve: {GasEstimate}, using gas limit: {GasLimit}",
-                gasEstimate.Value, gasLimit);
-
-            var txHash = await function.SendTransactionAsync(
-                _account.Address,
-                gasLimit.ToHexBigInteger(),
-                new BigInteger(0).ToHexBigInteger(), // gasPrice - let Nethereum handle this
-                _config.ContractAddress,
-                formattedAmount
-            );
+            string txHash = await EstimateGasAndSend(function, _config.ContractAddress, formattedAmount);
 
             _logger?.LogInformation("Allowance approval transaction sent: {TxHash}", txHash);
             return txHash;
@@ -143,53 +133,18 @@ public class NethereumBlockchainClient : IDisposable
         string content,
         MemoType memoType,
         bool isSecured,
-        AcpJobPhase nextPhase,
-        bool useSmartContractSigning = false)
+        AcpJobPhase nextPhase)
     {
         try
         {
             var function = _contract.GetFunction("createMemo");
 
-            // Check if smart contract signing is requested and signer address is available
-            if (useSmartContractSigning && !string.IsNullOrEmpty(_signerAddress))
-            {
-                var callData = function.GetData(jobId,
+            string txHash = await EstimateGasAndSend(function,
+                jobId,
                 content,
                 (int)memoType,
                 isSecured,
                 (int)nextPhase);
-                return await SignWithSmartContractAsync(_signerAddress, callData);
-            }
-
-            // Estimate gas for the transaction
-            // need from else this throws in sc
-            var gasEstimate = await function.EstimateGasAsync(
-                _account.Address,
-                new HexBigInteger(0),
-                new HexBigInteger(0),
-                jobId,
-                content,
-                (int)memoType,
-                isSecured,
-                (int)nextPhase
-            );
-
-            // Add 20% buffer to the gas estimate
-            var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
-
-            _logger?.LogInformation("Estimated gas for createMemo: {GasEstimate}, using gas limit: {GasLimit}",
-                gasEstimate.Value, gasLimit);
-
-            var txHash = await function.SendTransactionAsync(
-                _account.Address,
-                gasLimit.ToHexBigInteger(),
-                new BigInteger(0).ToHexBigInteger(), // gasPrice - let Nethereum handle this
-                jobId,
-                content,
-                (int)memoType,
-                isSecured,
-                (int)nextPhase
-            );
 
             _logger?.LogInformation("Memo creation transaction sent: {TxHash}", txHash);
             return txHash;
@@ -222,9 +177,8 @@ public class NethereumBlockchainClient : IDisposable
 
             var function = _contract.GetFunction("createPayableMemo");
 
-            // Estimate gas for the transaction
-            var gasEstimate = await function.EstimateGasAsync(
-                jobId,
+            string txHash = await EstimateGasAndSend(function,
+               jobId,
                 content,
                 tokenAddress,
                 formattedAmount,
@@ -233,30 +187,7 @@ public class NethereumBlockchainClient : IDisposable
                 (int)feeType,
                 (int)memoType,
                 (int)nextPhase,
-                expireTimestamp
-            );
-
-            // Add 20% buffer to the gas estimate
-            var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
-
-            _logger?.LogInformation("Estimated gas for createPayableMemo: {GasEstimate}, using gas limit: {GasLimit}",
-                gasEstimate.Value, gasLimit);
-
-            var txHash = await function.SendTransactionAsync(
-                _account.Address,
-                gasLimit.ToHexBigInteger(),
-                new BigInteger(0).ToHexBigInteger(), // gasPrice - let Nethereum handle this
-                jobId,
-                content,
-                tokenAddress,
-                formattedAmount,
-                receiverAddress,
-                formattedFeeAmount,
-                (int)feeType,
-                (int)memoType,
-                (int)nextPhase,
-                expireTimestamp
-            );
+                expireTimestamp);
 
             _logger?.LogInformation("Payable memo creation transaction sent: {TxHash}", txHash);
             return txHash;
@@ -268,44 +199,16 @@ public class NethereumBlockchainClient : IDisposable
         }
     }
 
-    public async Task<string> SignMemoAsync(int memoId, bool isApproved, string reason = "", bool useSmartContractSigning = false)
+    public async Task<string> SignMemoAsync(int memoId, bool isApproved, string reason = "")
     {
         try
-        {           
-
+        {
             var function = _contract.GetFunction("signMemo");
 
-            // Check if smart contract signing is requested and signer address is available
-            if (useSmartContractSigning && !string.IsNullOrEmpty(_signerAddress))
-            {
-                var callData = function.GetData(memoId, isApproved, reason);
-                return await SignWithSmartContractAsync(_signerAddress, callData);
-            }
-
-            // Estimate gas for the transaction
-            var gasEstimate = await function.EstimateGasAsync(
-                _account.Address,
-                new HexBigInteger(0),
-                new HexBigInteger(0),
+            string txHash = await EstimateGasAndSend(function,
                 memoId,
                 isApproved,
-                reason
-            );
-
-            // Add 20% buffer to the gas estimate
-            var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
-
-            _logger?.LogInformation("Estimated gas for signMemo: {GasEstimate}, using gas limit: {GasLimit}",
-                gasEstimate.Value, gasLimit);
-
-            var txHash = await function.SendTransactionAsync(
-                _account.Address,
-                gasLimit.ToHexBigInteger(),
-                new BigInteger(0).ToHexBigInteger(), // gasPrice - let Nethereum handle this
-                memoId,
-                isApproved,
-                reason
-            );
+                reason);
 
             _logger?.LogInformation("Memo signing transaction sent: {TxHash}", txHash);
             return txHash;
@@ -314,44 +217,6 @@ public class NethereumBlockchainClient : IDisposable
         {
             _logger?.LogError(ex, "Failed to sign memo");
             throw new AcpContractError("Failed to sign memo", ex);
-        }
-    }   
-
-    public async Task<string> SetBudgetAsync(int jobId, decimal budget)
-    {
-        try
-        {
-            var formattedBudget = FormatAmount(budget);
-
-            var function = _contract.GetFunction("setBudget");
-
-            // Estimate gas for the transaction
-            var gasEstimate = await function.EstimateGasAsync(
-                jobId,
-                formattedBudget
-            );
-
-            // Add 20% buffer to the gas estimate
-            var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
-
-            _logger?.LogInformation("Estimated gas for setBudget: {GasEstimate}, using gas limit: {GasLimit}",
-                gasEstimate.Value, gasLimit);
-
-            var txHash = await function.SendTransactionAsync(
-                _account.Address,
-                gasLimit.ToHexBigInteger(),
-                new BigInteger(0).ToHexBigInteger(), // gasPrice - let Nethereum handle this
-                jobId,
-                formattedBudget
-            );
-
-            _logger?.LogInformation("Budget setting transaction sent: {TxHash}", txHash);
-            return txHash;
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Failed to set budget");
-            throw new AcpContractError("Failed to set budget", ex);
         }
     }
 
@@ -364,31 +229,10 @@ public class NethereumBlockchainClient : IDisposable
 
             var function = _contract.GetFunction("setBudgetWithPaymentToken");
 
-            // Estimate gas for the transaction
-            // need to add from here, else msg_sender is wrong and this throws in the contract
-            var gasEstimate = await function.EstimateGasAsync(
-                _account.Address,
-                new HexBigInteger(0),
-                new HexBigInteger(0),
+            string txHash = await EstimateGasAndSend(function,
                 jobId,
                 formattedBudget,
-                tokenAddress
-            );
-
-            // Add 20% buffer to the gas estimate
-            var gasLimit = gasEstimate.Value + (gasEstimate.Value / 5);
-
-            _logger?.LogInformation("Estimated gas for setBudgetWithPaymentToken: {GasEstimate}, using gas limit: {GasLimit}",
-                gasEstimate.Value, gasLimit);
-
-            var txHash = await function.SendTransactionAsync(
-                _account.Address,
-                gasLimit.ToHexBigInteger(),
-                new BigInteger(0).ToHexBigInteger(), // gasPrice - let Nethereum handle this
-                jobId,
-                formattedBudget,
-                tokenAddress
-            );
+                tokenAddress);
 
             _logger?.LogInformation("Budget with payment token setting transaction sent: {TxHash}", txHash);
             return txHash;
@@ -397,20 +241,6 @@ public class NethereumBlockchainClient : IDisposable
         {
             _logger?.LogError(ex, "Failed to set budget with payment token");
             throw new AcpContractError("Failed to set budget with payment token", ex);
-        }
-    }
-
-    public async Task<bool> ValidateTransactionAsync(string txHash)
-    {
-        try
-        {
-            var receipt = await _web3.Eth.TransactionManager.TransactionReceiptService.PollForReceiptAsync(txHash);
-            return receipt.Status.Value == 1;
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Failed to validate transaction: {TxHash}", txHash);
-            throw new AcpContractError($"Failed to validate transaction: {txHash}", ex);
         }
     }
 
@@ -454,17 +284,15 @@ public class NethereumBlockchainClient : IDisposable
     /// <param name="smartContractAddress">The address of the smart contract that will sign the message</param>
     /// <param name="message">The message to be signed</param>
     /// <returns>The signature hash that can be validated using EIP-1271</returns>
-    public async Task<string> SignWithSmartContractAsync(
-        string smartContractAddress,
-        string encodedData)
+    public async Task<string> SignWithSmartContractAsync(string encodedData)
     {
         try
         {
-            _logger?.LogInformation("Signing message with smart contract: {SmartContractAddress}", smartContractAddress);
+            _logger?.LogInformation("Signing message with smart contract: {SmartContractAddress}", _signerAddress);
 
             // For ERC6900, we need to call the execute function with the signature data
             // This assumes the smart contract has been deployed and configured properly
-            var contract = _web3.Eth.GetContract(ContractAbis.ERC6900Abi, smartContractAddress);
+            var contract = _web3.Eth.GetContract(ContractAbis.ERC6900Abi, _signerAddress);
             var executeFunction = contract.GetFunction("execute");
 
             var data = encodedData.HexToByteArray();
@@ -475,17 +303,19 @@ public class NethereumBlockchainClient : IDisposable
                     0, // value
                  data);
 
-            var txHash = await executeFunction.SendTransactionAsync(
+            var cts = new CancellationTokenSource();
+            var txHash = await executeFunction.SendTransactionAndWaitForReceiptAsync(
                 _account.Address,
                 gas,
-                new HexBigInteger(0), 
+                new HexBigInteger(0),
+                cts.Token,
                 _contract.Address, // target contract
-                    0, // value
+                0, // value
                 data
                 );
 
             _logger?.LogInformation("Smart contract signing transaction sent: {TxHash}", txHash);
-            return txHash;
+            return txHash.TransactionHash;
         }
         catch (Exception ex)
         {

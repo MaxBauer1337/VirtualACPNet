@@ -19,7 +19,6 @@ public class AgentSearchExample
 
         var client = new VirtualsACPClient(
             walletPrivateKey: "0000000000000000000000000000000000000000000000000000000000000001",
-            entityId: 12345,
             config: Configurations.BaseSepoliaConfig,
             logger: logger
         );

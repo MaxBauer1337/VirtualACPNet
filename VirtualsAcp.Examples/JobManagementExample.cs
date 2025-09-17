@@ -17,26 +17,56 @@ public class JobManagementExample
             builder.AddConsole().SetMinimumLevel(LogLevel.Information));
         var logger = loggerFactory.CreateLogger<VirtualsACPClient>();
 
+        // variables
+        string privateKeySeller = "0x1";
+        string agentWalletSeller = "0x2";
+        string privateKeyBuyer = "0x1";
+        string agentWalletBuyer = "0x2";       
+
+
         // Initialize client with event handlers
-        var provider = new VirtualsACPClient(
-            walletPrivateKey: "1",
-            agentWalletAddress: "0x0987654321098765432109876543210987654321",
-            entityId: 12345,
+        VirtualsACPClient provider = null;
+        VirtualsACPClient client = null;
+        provider = new VirtualsACPClient(
+            walletPrivateKey: privateKeySeller,
+            agentWalletAddress: agentWalletSeller,
             config: Configurations.BaseMainnetConfig,
             onNewTask: async (job, memoToSign) =>
             {
-                Console.WriteLine($"📨 New task received: Job {job.Id}");
-                Console.WriteLine($"   Service: {job.ServiceName}");
-                Console.WriteLine($"   Provider: {job.ProviderAddress}");
-                Console.WriteLine($"   Price: {job.Price}");
-
-                if (memoToSign != null)
+                LogTask(job, memoToSign);
+               if (job.Phase == AcpJobPhase.Request && job.Memos.Any(x => x.NextPhase == AcpJobPhase.Negotiation))
                 {
-                    Console.WriteLine($"   Memo to sign: {memoToSign.Id}");
+                    Console.WriteLine("\nResponding to job...");
+                    var responseTxHash = await provider.RespondToJobAsync(
+                        jobId: job.Id,
+                        memoId: memoToSign.Id,
+                        accept: true,
+                        content: "I can complete this project within 3 days",
+                        reason: "I have experience with similar projects"
+                    );
+                    Console.WriteLine($"✅ Job response sent: {responseTxHash}");
+                }
+                else if (job.Phase == AcpJobPhase.Transaction && job.Memos.Any(x => x.NextPhase == AcpJobPhase.Evaluation))
+                {
+                    Console.WriteLine("Delivering job");
+                    var deliverable = new Deliverable
+                    {
+                        Type = "website",
+                        Value = new
+                        {
+                            url = "https://example.com/website",
+                            files = new[] { "index.html", "style.css", "script.js" },
+                            description = "Responsive website with contact form"
+                        }
+                    };
+
+                    var deliveryTxHash = await provider.DeliverJobAsync(job.Id, deliverable);
+                    Console.WriteLine($"✅ Work delivered: {deliveryTxHash}");
                 }
             },
-            onEvaluate: async (job) =>
+            onEvaluate: async (job, memo) =>
             {
+                // shouldn't be called on provider
                 Console.WriteLine($"🔍 Evaluating job: {job.Id}");
                 //Simulate evaluation logic
                 await Task.Delay(1000);
@@ -45,21 +75,58 @@ public class JobManagementExample
             logger: logger
         );
 
-        var client = new VirtualsACPClient(
-           walletPrivateKey: "1",
-           entityId: 12346,
-           config: Configurations.BaseMainnetConfig,          
+        client = new VirtualsACPClient(
+           walletPrivateKey: privateKeyBuyer,
+           agentWalletAddress: agentWalletBuyer,
+           config: Configurations.BaseMainnetConfig,
+           onNewTask: async (job, memoToSign) =>
+            {
+                LogTask(job, memoToSign);
+                if (job.Phase == AcpJobPhase.Negotiation && memoToSign?.NextPhase == AcpJobPhase.Transaction)
+                {
+                    var paymentResult = await client.PayJobAsync(
+                        jobId: job.Id,
+                        memoId: memoToSign.Id,
+                        amount: 0.1m,
+                        reason: "Payment for completed work"
+                    );
+
+                    Console.WriteLine($"✅ Payment processed: {paymentResult["txHash"]}");
+                }
+                else if (job.Phase == AcpJobPhase.Completed)
+                {
+                    Console.WriteLine($"Job completed: {job.Id}");
+                }
+                else if (job.Phase == AcpJobPhase.Rejected)
+                {
+                    Console.WriteLine($"Job rejected: {job.Id}");
+                }
+            },
+            onEvaluate: async (job, memo) =>
+            {
+                Console.WriteLine($"🔍 Evaluating job: {job.Id}");
+
+                var evaluationTxHash = await client.SignMemoAsync(
+                    memoId: memo.Id,
+                    accept: true,
+                    reason: "Work meets all requirements and quality standards"
+                );
+
+                Console.WriteLine($"✅ Evaluation completed: {evaluationTxHash}");
+                return (true, "Work completed successfully");
+            },
            logger: logger
        );
 
         try
         {
             await provider.StartAsync();
+            await client.StartAsync();
 
             // Example 1: Create a job
             Console.WriteLine("Creating a new job...");
             var jobId = await client.InitiateJobAsync(
-                providerAddress: "0x0987654321098765432109876543210987654321",
+                providerAddress: agentWalletSeller,
                 serviceRequirement: new
                 {
                     message = "Create a simple website with contact form",
@@ -69,79 +136,17 @@ public class JobManagementExample
                         features = new[] { "responsive", "contact form" }
                     }
                 },
-                amount: 0.1,
-                //evaluatorAddress: "0x0987654321098765432109876543210987654321",
+                amount: 0.1m,
                 expiredAt: DateTime.UtcNow.AddDays(7)
             );
 
             Console.WriteLine($"✅ Job created with ID: {jobId}");
 
             await Task.Delay(10_000); // wait else memos might be empty
-            //Console.ReadLine();
-
-            // Example 2: Get job details
-            Console.WriteLine("\nFetching job details...");
-            ACPJob? job = await RefreshJob(provider, jobId);
-
-            // Example 3: Respond to a job (as a provider)
-            Console.WriteLine("\nResponding to job...");
-            var responseTxHash = await provider.RespondToJobAsync(
-                jobId: jobId,
-                memoId: job.Memos.First().Id,
-                accept: true,
-                content: "I can complete this project within 3 days",
-                reason: "I have experience with similar projects"
-            );
-
-            Console.WriteLine($"✅ Job response sent: {responseTxHash}");
-
-            await Task.Delay(10_000);
-
+            // wait indefinetly, rest should be handled in event han
+            Console.WriteLine("Waiting indefinetly, all logic should be handled by events");
             Console.ReadLine();
-
-            // Example 4: Pay for a job (as a client)
-            Console.WriteLine("\nPaying for job...");
-            job = await RefreshJob(client, jobId);
-            var paymentResult = await client.PayJobAsync(
-                jobId: jobId,
-                memoId: job.Memos[1].Id,
-                amount: 0.1,
-                reason: "Payment for completed work"
-            );
-
-            Console.WriteLine($"✅ Payment processed: {paymentResult["txHash"]}");
-
-            await Task.Delay(10_000);
-
-            // Example 5: Deliver work (as a provider)
-            Console.WriteLine("\nDelivering work...");
-            var deliverable = new Deliverable
-            {
-                Type = "website",
-                Value = new
-                {
-                    url = "https://example.com/website",
-                    files = new[] { "index.html", "style.css", "script.js" },
-                    description = "Responsive website with contact form"
-                }
-            };
-
-            var deliveryTxHash = await provider.DeliverJobAsync(jobId, deliverable);
-            Console.WriteLine($"✅ Work delivered: {deliveryTxHash}");
-
-            await Task.Delay(10_000);
-
-            job = await RefreshJob(client, jobId);
-
-            // Example 6: Evaluate delivery (as an evaluator)
-            Console.WriteLine("\nEvaluating delivery...");
-            var evaluationTxHash = await client.SignMemoAsync(
-                memoId: job.Memos[2].Id,
-                accept: true,
-                reason: "Work meets all requirements and quality standards"
-            );
-
-            Console.WriteLine($"✅ Evaluation completed: {evaluationTxHash}");
+            return;          
         }
         catch (Exception ex)
         {
@@ -151,7 +156,21 @@ public class JobManagementExample
         finally
         {
             provider.Dispose();
+            client.Dispose();
         }
+    }
+
+    private static void LogTask(ACPJob job, ACPMemo? memoToSign)
+    {
+        Console.WriteLine($"📨 New task received: Job {job.Id}");
+        Console.WriteLine($"   Service: {job.ServiceName}");
+        Console.WriteLine($"   Provider: {job.ProviderAddress}");
+        Console.WriteLine($"   Price: {job.Price}");
+        Console.WriteLine($"   Phase: {job.Phase}");
+        Console.WriteLine($"   Memos: {job.Memos.Count}");
+
+        if (memoToSign != null)
+            Console.WriteLine($"   Memo to sign: {memoToSign.Id}");
     }
 
     private static async Task<ACPJob?> RefreshJob(VirtualsACPClient client, int jobId)

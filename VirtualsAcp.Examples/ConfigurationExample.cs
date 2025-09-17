@@ -38,7 +38,6 @@ public class ConfigurationExample
 
             var client = new VirtualsACPClient(
                 walletPrivateKey: "0000000000000000000000000000000000000000000000000000000000000001",
-                entityId: 12345,
                 config: config,
                 logger: logger
             );
@@ -99,7 +98,6 @@ public class ConfigurationExample
 
                 var client = new VirtualsACPClient(
                     walletPrivateKey: envSettings.WhitelistedWalletPrivateKey,
-                    entityId: envSettings.BuyerEntityId ?? 12345,
                     agentWalletAddress: envSettings.BuyerAgentWalletAddress,
                     config: Configurations.DefaultConfig,
                     logger: logger

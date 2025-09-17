@@ -16,14 +16,12 @@ public class VirtualsACPClient : IDisposable
     private readonly ILogger? _logger;
     private readonly AcpContractConfig _config;
     private readonly string _agentAddress;
-    private readonly int _entityId;
 
     public event Func<ACPJob, ACPMemo?, Task>? OnNewTask;
     public event Func<ACPJob, ACPMemo?, Task<(bool, string)>>? OnEvaluate;
 
     public VirtualsACPClient(
         string walletPrivateKey,
-        int entityId,
         string? agentWalletAddress = null,
         AcpContractConfig? config = null,
         Func<ACPJob, ACPMemo?, Task>? onNewTask = null,
@@ -31,7 +29,6 @@ public class VirtualsACPClient : IDisposable
         ILogger? logger = null)
     {
         _config = config ?? Configurations.DefaultConfig;
-        _entityId = entityId;
         _logger = logger;
 
         // Initialize blockchain client
@@ -219,6 +216,8 @@ public class VirtualsACPClient : IDisposable
 
         var jobId = await _blockchainClient.GetJobIdFromTransactionAsync(txHash);
 
+        await Task.Delay(2000); // needed for some reason, maybe rpc to slow??
+
         // Set budget
         await _blockchainClient.SetBudgetWithPaymentTokenAsync((int)jobId, amount);
         
@@ -271,6 +270,8 @@ public class VirtualsACPClient : IDisposable
             _logger?.LogInformation("Responding to job {JobId} with memo {MemoId} and accept {Accept} and reason {Reason}",
                 jobId, memoId, accept, reason);
 
+            await Task.Delay(5000); // virtual backend needs this, has issues sending event
+
             await _blockchainClient.CreateMemoAsync(
                 jobId,
                 content ?? $"Job {jobId} accepted. {reason ?? ""}",
@@ -297,7 +298,9 @@ public class VirtualsACPClient : IDisposable
         decimal amount,
         string? reason = "")
     {
-        await _blockchainClient.ApproveAllowanceAsync(amount*1.1m); // add extra as test to fix possible error
+        await _blockchainClient.ApproveAllowanceAsync(amount);
+
+        await Task.Delay(5000);
 
         await _blockchainClient.SignMemoAsync(memoId, true, reason ?? "");
 

@@ -19,7 +19,7 @@ public class VirtualsACPClient : IDisposable
     private readonly int _entityId;
 
     public event Func<ACPJob, ACPMemo?, Task>? OnNewTask;
-    public event Func<ACPJob, Task<(bool, string)>>? OnEvaluate;
+    public event Func<ACPJob, ACPMemo?, Task<(bool, string)>>? OnEvaluate;
 
     public VirtualsACPClient(
         string walletPrivateKey,
@@ -27,7 +27,7 @@ public class VirtualsACPClient : IDisposable
         string? agentWalletAddress = null,
         AcpContractConfig? config = null,
         Func<ACPJob, ACPMemo?, Task>? onNewTask = null,
-        Func<ACPJob, Task<(bool, string)>>? onEvaluate = null,
+        Func<ACPJob, ACPMemo?, Task<(bool, string)>>? onEvaluate = null,
         ILogger? logger = null)
     {
         _config = config ?? Configurations.DefaultConfig;
@@ -170,7 +170,7 @@ public class VirtualsACPClient : IDisposable
 
             if (OnEvaluate != null)
             {
-                var (accepted, reason) = await OnEvaluate(job);
+                var (accepted, reason) = await OnEvaluate(job, job.Memos.FirstOrDefault(x => x.Type == "REQUEST_EVALUATION"));
                 await SignMemoAsync(job.LatestMemo?.Id ?? 0, accepted, reason);
             }
         }
@@ -202,7 +202,7 @@ public class VirtualsACPClient : IDisposable
     public async Task<int> InitiateJobAsync(
         string providerAddress,
         object serviceRequirement,
-        double amount,
+        decimal amount,
         string? evaluatorAddress = null,
         DateTime? expiredAt = null)
     {
@@ -301,10 +301,10 @@ public class VirtualsACPClient : IDisposable
     public async Task<Dictionary<string, object>> PayJobAsync(
         int jobId,
         int memoId,
-        double amount,
+        decimal amount,
         string? reason = "")
     {
-        await _blockchainClient.ApproveAllowanceAsync(amount);
+        await _blockchainClient.ApproveAllowanceAsync(amount*1.1m); // add extra as test to fix possible error
 
         await _blockchainClient.SignMemoAsync(memoId, true, reason ?? "");
 
@@ -325,9 +325,9 @@ public class VirtualsACPClient : IDisposable
 
     public async Task<string> RequestFundsAsync(
         int jobId,
-        double amount,
+        decimal amount,
         string receiverAddress,
-        double feeAmount,
+        decimal feeAmount,
         FeeType feeType,
         GenericPayload reason,
         AcpJobPhase nextPhase,
@@ -351,7 +351,7 @@ public class VirtualsACPClient : IDisposable
     public async Task<string> RespondToFundsRequestAsync(
         int memoId,
         bool accept,
-        double amount,
+        decimal amount,
         string? reason = "")
     {
         if (!accept)
@@ -371,9 +371,9 @@ public class VirtualsACPClient : IDisposable
 
     public async Task<string> TransferFundsAsync(
         int jobId,
-        double amount,
+        decimal amount,
         string receiverAddress,
-        double feeAmount,
+        decimal feeAmount,
         FeeType feeType,
         GenericPayload reason,
         AcpJobPhase nextPhase,

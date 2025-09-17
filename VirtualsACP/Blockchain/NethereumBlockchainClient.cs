@@ -51,11 +51,10 @@ public class NethereumBlockchainClient : IDisposable
 
     public string AgentAddress => _account.Address;
 
-    private BigInteger FormatAmount(double amount)
+    private BigInteger FormatAmount(decimal amount)
     {
-        var amountDecimal = (decimal)amount;
         var multiplier = BigInteger.Pow(10, _config.PaymentTokenDecimals);
-        return (BigInteger)(amountDecimal * (decimal)multiplier);
+        return (BigInteger)(amount * (decimal)multiplier);
     }
 
     public async Task<string> CreateJobAsync(string providerAddress, string evaluatorAddress, DateTime expiredAt)
@@ -98,7 +97,7 @@ public class NethereumBlockchainClient : IDisposable
         }
     }
 
-    public async Task<string> ApproveAllowanceAsync(double amount)
+    public async Task<string> ApproveAllowanceAsync(decimal amount)
     {
         try
         {
@@ -205,9 +204,9 @@ public class NethereumBlockchainClient : IDisposable
     public async Task<string> CreatePayableMemoAsync(
         int jobId,
         string content,
-        double amount,
+        decimal amount,
         string receiverAddress,
-        double feeAmount,
+        decimal feeAmount,
         FeeType feeType,
         AcpJobPhase nextPhase,
         MemoType memoType,
@@ -318,7 +317,7 @@ public class NethereumBlockchainClient : IDisposable
         }
     }   
 
-    public async Task<string> SetBudgetAsync(int jobId, double budget)
+    public async Task<string> SetBudgetAsync(int jobId, decimal budget)
     {
         try
         {
@@ -356,7 +355,7 @@ public class NethereumBlockchainClient : IDisposable
         }
     }
 
-    public async Task<string> SetBudgetWithPaymentTokenAsync(int jobId, double budget, string? paymentTokenAddress = null)
+    public async Task<string> SetBudgetWithPaymentTokenAsync(int jobId, decimal budget, string? paymentTokenAddress = null)
     {
         try
         {

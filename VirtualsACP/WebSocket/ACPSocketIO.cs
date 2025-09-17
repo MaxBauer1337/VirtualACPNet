@@ -70,7 +70,6 @@ public class ACPSocketIO : IDisposable
 
     private void SetupEventHandlers()
     {
-        // Equivalent to Python's self.sio.on('roomJoined', self._on_room_joined)
         _client.On("roomJoined", response =>
         {
             var data = response.GetValue<object>();
@@ -82,7 +81,6 @@ public class ACPSocketIO : IDisposable
             }
         });
 
-        // Equivalent to Python's self.sio.on('onEvaluate', self._on_evaluate)
         _client.On("onEvaluate", response =>
         {
             var data = response.GetValue<object>();
@@ -94,7 +92,6 @@ public class ACPSocketIO : IDisposable
             }
         });
 
-        // Equivalent to Python's self.sio.on('onNewTask', self._on_new_task)
         _client.On("onNewTask", response =>
         {
             var data = response.GetValue<object>();

@@ -308,6 +308,8 @@ public class VirtualsACPClient : IDisposable
         _logger?.LogInformation("Paid for job {JobId} with memo {MemoId} and amount {Amount} and reason {Reason}",
             jobId, memoId, amount, reason);
 
+        await Task.Delay(5000);
+
         var txHash = await _blockchainClient.CreateMemoAsync(
             jobId,
             reason,

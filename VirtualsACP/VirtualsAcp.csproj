@@ -5,11 +5,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <PackageId>VirtualsAcp</PackageId>
+    <PackageId>VirtualsAcpNet</PackageId>
     <Version>0.1.0</Version>
-    <Authors>Virtuals</Authors>
+    <Authors>MaxBauer1337</Authors>
     <Description>C# SDK for the Virtuals Agent Contract Protocol (ACP)</Description>
-    <PackageProjectUrl>https://github.com/virtuals-io/acp-python</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/MaxBauer1337/VirtualACPNet</PackageProjectUrl>
     <RepositoryUrl>https://github.com/virtuals-io/acp-python</RepositoryUrl>
     <PackageTags>ethereum;blockchain;acp;virtuals;nethereum</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

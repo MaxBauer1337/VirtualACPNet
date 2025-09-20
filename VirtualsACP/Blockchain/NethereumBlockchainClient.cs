@@ -84,7 +84,7 @@ public class NethereumBlockchainClient : IDisposable
         if (!string.IsNullOrEmpty(_signerAddress))
         {
             var callData = function.GetData(inputs);
-            return await SignWithSmartContractAsync(callData);
+            return await SignWithSmartContractAsync(function.ContractAddress, callData);
         }
         return await EstimateGasAndSendDirect(function, inputs);
 
@@ -290,7 +290,7 @@ public class NethereumBlockchainClient : IDisposable
     /// <param name="smartContractAddress">The address of the smart contract that will sign the message</param>
     /// <param name="message">The message to be signed</param>
     /// <returns>The signature hash that can be validated using EIP-1271</returns>
-    public async Task<string> SignWithSmartContractAsync(string encodedData)
+    public async Task<string> SignWithSmartContractAsync(string targetContract, string encodedData)
     {
         try
         {
@@ -303,7 +303,7 @@ public class NethereumBlockchainClient : IDisposable
 
             var data = encodedData.HexToByteArray();
 
-            var inParams = new object[] { _contract.Address, 0, data };
+            var inParams = new object[] { targetContract, 0, data };
             var gas = await executeFunction.EstimateGasAsync(_account.Address,
                 new HexBigInteger(0),
                 new HexBigInteger(0),

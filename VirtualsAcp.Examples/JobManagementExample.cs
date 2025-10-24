@@ -17,16 +17,45 @@ public class JobManagementExample
             builder.AddConsole().SetMinimumLevel(LogLevel.Information));
         var logger = loggerFactory.CreateLogger<VirtualsACPClient>();
 
-        // variables
-        string privateKeySeller = "0x1";
-        string agentWalletSeller = "0x2";
-        string privateKeyBuyer = "0x1";
-        string agentWalletBuyer = "0x2";       
+        // ⚠️ CONFIGURATION REQUIRED:
+        // These values should match what you configured in DegenAI Settings page (/admin/settings)
+        
+        // Provider (seller) - DegenAI agent smart contract (receives and processes jobs)
+        string privateKeySeller = ""; // Your ACP Provider Private Key from Settings
+        string agentWalletSeller = ""; // Your ACP Agent Address from Settings
+        
+        // Requester (buyer) - Test requester agent smart contract
+        string privateKeyBuyer = ""; // Your Test Requester Private Key from Settings
+        string agentWalletBuyer = ""; // Your Test Requester Agent Address
+
+        // Validate configuration
+        if (string.IsNullOrWhiteSpace(privateKeySeller) || string.IsNullOrWhiteSpace(agentWalletSeller))
+        {
+            Console.WriteLine("❌ ERROR: ACP Provider configuration missing!");
+            Console.WriteLine("Please set privateKeySeller and agentWalletSeller in JobManagementExample.cs");
+            Console.WriteLine("Use the same values you configured in DegenAI Settings page (/admin/settings)");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(privateKeyBuyer) || string.IsNullOrWhiteSpace(agentWalletBuyer))
+        {
+            Console.WriteLine("❌ ERROR: ACP Test Requester configuration missing!");
+            Console.WriteLine("Please set privateKeyBuyer and agentWalletBuyer in JobManagementExample.cs");
+            Console.WriteLine("Use the Test Requester credentials from DegenAI Settings page (/admin/settings)");
+            return;
+        }
+
+        Console.WriteLine($"✅ Using Provider Agent: {agentWalletSeller}");
+        Console.WriteLine($"✅ Using Test Requester: {agentWalletBuyer}");     
 
 
         // Initialize client with event handlers
-        VirtualsACPClient provider = null;
+        // COMMENTED OUT: DegenAI is the actual seller/provider
+        // We only need the buyer/client in this example to avoid wallet conflicts
+        // VirtualsACPClient provider = null;
         VirtualsACPClient client = null;
+        
+        /* PROVIDER COMMENTED OUT - DegenAI is the seller
         provider = new VirtualsACPClient(
             walletPrivateKey: privateKeySeller,
             agentWalletAddress: agentWalletSeller,
@@ -74,6 +103,7 @@ public class JobManagementExample
             },
             logger: logger
         );
+        */
 
         client = new VirtualsACPClient(
            walletPrivateKey: privateKeyBuyer,
@@ -120,22 +150,14 @@ public class JobManagementExample
 
         try
         {
-            await provider.StartAsync();
+            // await provider.StartAsync(); // DegenAI is the seller
             await client.StartAsync();
 
-            // Example 1: Create a job
+            // Example 1: Create a job (Real trading request)
             Console.WriteLine("Creating a new job...");
             var jobId = await client.InitiateJobAsync(
                 providerAddress: agentWalletSeller,
-                serviceRequirement: new
-                {
-                    message = "Create a simple website with contact form",
-                    requirements = new
-                    {
-                        pages = new[] { "home", "about", "contact" },
-                        features = new[] { "responsive", "contact form" }
-                    }
-                },
+                serviceRequirement: "Long BTC at 105k with $100 total. Add take profit at 108k and stop loss at 103k",
                 amount: 0.1m,
                 expiredAt: DateTime.UtcNow.AddDays(7)
             );
@@ -155,7 +177,7 @@ public class JobManagementExample
         }
         finally
         {
-            provider.Dispose();
+            // provider.Dispose(); // DegenAI is the seller
             client.Dispose();
         }
     }

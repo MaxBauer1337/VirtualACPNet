@@ -84,22 +84,34 @@ public class ACPSocketIO : IDisposable
         _client.On("onEvaluate", response =>
         {
             var data = response.GetValue<object>();
+            _logger?.LogInformation("━━━ WebSocket: 'onEvaluate' event received ━━━");
             _logger?.LogInformation("Received evaluate event: {Data}", JsonSerializer.Serialize(data));
 
             if (OnEvaluate != null)
             {
+                _logger?.LogInformation("Triggering OnEvaluate callback");
                 _ = Task.Run(async () => await OnEvaluate(data));
+            }
+            else
+            {
+                _logger?.LogWarning("OnEvaluate callback is null, not triggering");
             }
         });
 
         _client.On("onNewTask", response =>
         {
             var data = response.GetValue<object>();
+            _logger?.LogInformation("━━━ WebSocket: 'onNewTask' event received ━━━");
             _logger?.LogInformation("Received new task event: {Data}", JsonSerializer.Serialize(data));
 
             if (OnNewTask != null)
             {
+                _logger?.LogInformation("Triggering OnNewTask callback");
                 _ = Task.Run(async () => await OnNewTask(data));
+            }
+            else
+            {
+                _logger?.LogWarning("OnNewTask callback is null, not triggering");
             }
         });
     }
@@ -145,6 +157,11 @@ public class ACPSocketIO : IDisposable
             if (!string.IsNullOrEmpty(evaluatorAddress))
             {
                 authData["evaluatorAddress"] = evaluatorAddress;
+                _logger?.LogInformation("━━━ Registering as evaluator: {EvaluatorAddress} ━━━", evaluatorAddress);
+            }
+            else
+            {
+                _logger?.LogWarning("No evaluatorAddress provided - onEvaluate events may not fire");
             }
 
             // Set auth data before connecting

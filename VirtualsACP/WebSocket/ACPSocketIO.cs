@@ -84,12 +84,9 @@ public class ACPSocketIO : IDisposable
         _client.On("onEvaluate", response =>
         {
             var data = response.GetValue<object>();
-            _logger?.LogInformation("━━━ WebSocket: 'onEvaluate' event received ━━━");
-            _logger?.LogInformation("Received evaluate event: {Data}", JsonSerializer.Serialize(data));
 
             if (OnEvaluate != null)
             {
-                _logger?.LogInformation("Triggering OnEvaluate callback");
                 _ = Task.Run(async () => await OnEvaluate(data));
             }
             else
@@ -101,12 +98,9 @@ public class ACPSocketIO : IDisposable
         _client.On("onNewTask", response =>
         {
             var data = response.GetValue<object>();
-            _logger?.LogInformation("━━━ WebSocket: 'onNewTask' event received ━━━");
-            _logger?.LogInformation("Received new task event: {Data}", JsonSerializer.Serialize(data));
 
             if (OnNewTask != null)
             {
-                _logger?.LogInformation("Triggering OnNewTask callback");
                 _ = Task.Run(async () => await OnNewTask(data));
             }
             else

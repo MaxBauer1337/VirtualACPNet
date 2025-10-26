@@ -52,11 +52,11 @@ public class VirtualsACPClient : IDisposable
     public string AgentAddress => _agentAddress;
     public string SignerAddress => _blockchainClient.AgentAddress;
 
-    public async Task StartAsync()
+    public async Task StartAsync(string? walletAddress = null, string? evaluatorAddress = null)
     {
         if (socketClient != null)
         {
-            await socketClient.StartAsync(_agentAddress);
+            await socketClient.StartAsync(walletAddress ?? _agentAddress, evaluatorAddress);
         }
     }
 
@@ -146,9 +146,13 @@ public class VirtualsACPClient : IDisposable
                 }
             }
 
-            var context = jobData.TryGetValue("context", out var contextValue)
-                ? JsonSerializer.Deserialize<Dictionary<string, object>>(contextValue.ToString() ?? "{}")
-                : null;
+            Dictionary<string, object>? context = null;
+            if (jobData.TryGetValue("context", out var contextValue) && 
+                contextValue is JsonElement contextElement && 
+                contextElement.ValueKind != JsonValueKind.Null)
+            {
+                context = JsonSerializer.Deserialize<Dictionary<string, object>>(contextElement.GetRawText());
+            }
 
             var job = new ACPJob
             {
@@ -167,8 +171,27 @@ public class VirtualsACPClient : IDisposable
 
             if (OnEvaluate != null)
             {
-                var (accepted, reason) = await OnEvaluate(job, job.Memos.FirstOrDefault(x => x.Type == "REQUEST_EVALUATION"));
-                await SignMemoAsync(job.LatestMemo?.Id ?? 0, accepted, reason);
+                // In self-evaluation scenarios, the memo to sign is DELIVER_SERVICE with nextPhase=4
+                var memoToSign = job.Memos.FirstOrDefault(x => x.Type == "DELIVER_SERVICE" && x.NextPhase == AcpJobPhase.Completed);
+                
+                if (memoToSign == null)
+                {
+                    // Fallback: try REQUEST_EVALUATION for non-self-evaluation scenarios
+                    memoToSign = job.Memos.FirstOrDefault(x => x.Type == "REQUEST_EVALUATION");
+                }
+                
+                var (accepted, reason) = await OnEvaluate(job, memoToSign);
+                
+                // Sign the correct memo (the one that's PENDING and needs signature)
+                var memoIdToSign = memoToSign?.Id ?? job.LatestMemo?.Id ?? 0;
+                
+                if (memoIdToSign == 0)
+                {
+                    _logger?.LogError("No valid memo to sign for job {JobId} evaluation", job.Id);
+                    return;
+                }
+                
+                await SignMemoAsync(memoIdToSign, accepted, reason);
             }
         }
         catch (Exception ex)
@@ -302,22 +325,26 @@ public class VirtualsACPClient : IDisposable
 
         await Task.Delay(5000);
 
-        await _blockchainClient.SignMemoAsync(memoId, true, reason ?? "");
+        var txHash = await _blockchainClient.SignMemoAsync(memoId, true, reason ?? "");
 
-        reason = !string.IsNullOrEmpty(reason) ? reason : $"Job {jobId} paid.";
-        _logger?.LogInformation("Paid for job {JobId} with memo {MemoId} and amount {Amount} and reason {Reason}",
-            jobId, memoId, amount, reason);
+        _logger?.LogInformation("Paid for job {JobId} with memo {MemoId} and amount {Amount}",
+            jobId, memoId, amount);
 
-        await Task.Delay(5000);
-
-        var txHash = await _blockchainClient.CreateMemoAsync(
+        // ✅ CRITICAL: Create EVALUATION trigger memo to transition job phase
+        // This tells the seller that payment is complete and they should deliver
+        // Reference: Official Python SDK's pay_and_accept_requirement() does this
+        await Task.Delay(5000); // Allow payment memo to settle
+        
+        await _blockchainClient.CreateMemoAsync(
             jobId,
-            reason,
+            $"Payment made. {reason ?? ""}".Trim(),
             MemoType.Message,
-            false,
-            AcpJobPhase.Evaluation
+            true,
+            AcpJobPhase.Evaluation // ← Transitions job to EVALUATION phase, triggers seller
         );
-
+        
+        _logger?.LogInformation("Created EVALUATION trigger memo for job {JobId}", jobId);
+        
         return new Dictionary<string, object> { ["txHash"] = txHash };
     }
 
@@ -436,9 +463,10 @@ public class VirtualsACPClient : IDisposable
             deliverableJson,
             MemoType.ObjectUrl,
             true,
-            AcpJobPhase.Completed
+            AcpJobPhase.Completed  // ✅ CORRECT: Creates memo with nextPhase=4, job completes after buyer approval (matches official SDK)
         );
 
+        _logger?.LogInformation("Delivered job {JobId} with nextPhase=Completed", jobId);
         return txHash;
     }
 

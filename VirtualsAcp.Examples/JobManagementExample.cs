@@ -17,16 +17,37 @@ public class JobManagementExample
             builder.AddConsole().SetMinimumLevel(LogLevel.Information));
         var logger = loggerFactory.CreateLogger<VirtualsACPClient>();
 
-        // variables
-        string privateKeySeller = "0x1";
-        string agentWalletSeller = "0x2";
-        string privateKeyBuyer = "0x1";
-        string agentWalletBuyer = "0x2";       
+        // ⚠️ CONFIGURATION REQUIRED:
+        // Set the seller address (where to send jobs)
+        
+        // Provider (seller) - agent address (running separately)
+        // We only need the ADDRESS to send jobs to, not the private key
+        string agentWalletSeller = ""; 
+        
+        // Requester (buyer) - Test requester credentials (pre-configured)
+        string privateKeyBuyer = ""; 
+        string agentWalletBuyer = ""; 
+
+        // Validate configuration
+        if (string.IsNullOrWhiteSpace(agentWalletSeller))
+        {
+            Console.WriteLine("❌ ERROR: seller address not set!");
+            Console.WriteLine("Please set agentWalletSeller in JobManagementExample.cs (line 26)");
+            Console.WriteLine("\nExample: agentWalletSeller = \"0x1234...\";");
+            return;
+        }
+
+        Console.WriteLine($"✅ Sending jobs to: {agentWalletSeller}");
+        Console.WriteLine($"✅ Using test buyer: {agentWalletBuyer}");     
 
 
         // Initialize client with event handlers
-        VirtualsACPClient provider = null;
+        // COMMENTED OUT: Seller/provider functionality is not tested in this example
+        // We only need the buyer/client in this example to avoid wallet conflicts
+        // VirtualsACPClient provider = null;
         VirtualsACPClient client = null;
+        
+        /* PROVIDER COMMENTED OUT - example is currently only tested as buyer
         provider = new VirtualsACPClient(
             walletPrivateKey: privateKeySeller,
             agentWalletAddress: agentWalletSeller,
@@ -74,6 +95,7 @@ public class JobManagementExample
             },
             logger: logger
         );
+        */
 
         client = new VirtualsACPClient(
            walletPrivateKey: privateKeyBuyer,
@@ -82,8 +104,10 @@ public class JobManagementExample
            onNewTask: async (job, memoToSign) =>
             {
                 LogTask(job, memoToSign);
+                
                 if (job.Phase == AcpJobPhase.Negotiation && memoToSign?.NextPhase == AcpJobPhase.Transaction)
                 {
+                    Console.WriteLine($"💰 Paying for job {job.Id}...");
                     var paymentResult = await client.PayJobAsync(
                         jobId: job.Id,
                         memoId: memoToSign.Id,
@@ -93,49 +117,63 @@ public class JobManagementExample
 
                     Console.WriteLine($"✅ Payment processed: {paymentResult["txHash"]}");
                 }
+                else if (memoToSign?.Type == "DELIVER_SERVICE" && memoToSign?.NextPhase == AcpJobPhase.Completed)
+                {
+                    Console.WriteLine($"📦 Approving delivery for job {job.Id}...");
+                    
+                    await client.SignMemoAsync(
+                        memoId: memoToSign.Id,
+                        accept: true,
+                        reason: "Delivery approved, job complete"
+                    );
+                    
+                    Console.WriteLine($"✅ Delivery approved, job moving to completion");
+                }
                 else if (job.Phase == AcpJobPhase.Completed)
                 {
-                    Console.WriteLine($"Job completed: {job.Id}");
+                    Console.WriteLine($"✅ Job completed: {job.Id}");
                 }
                 else if (job.Phase == AcpJobPhase.Rejected)
                 {
-                    Console.WriteLine($"Job rejected: {job.Id}");
+                    Console.WriteLine($"\n❌ Job {job.Id} was REJECTED");
+                    
+                    var rejectedMemo = job.Memos.FirstOrDefault(m => m.Status == "REJECTED");
+                    if (rejectedMemo != null)
+                    {
+                        Console.WriteLine($"Rejection reason: {rejectedMemo.SignedReason}");
+                        if (!string.IsNullOrWhiteSpace(rejectedMemo.Content))
+                        {
+                            Console.WriteLine($"\nButler/Buyer would see:\n{rejectedMemo.Content}\n");
+                        }
+                    }
                 }
             },
             onEvaluate: async (job, memo) =>
             {
-                Console.WriteLine($"🔍 Evaluating job: {job.Id}");
-
-                var evaluationTxHash = await client.SignMemoAsync(
-                    memoId: memo.Id,
-                    accept: true,
-                    reason: "Work meets all requirements and quality standards"
-                );
-
-                Console.WriteLine($"✅ Evaluation completed: {evaluationTxHash}");
-                return (true, "Work completed successfully");
+                // Note: This callback only fires for external evaluation scenarios (when buyer ≠ evaluator)
+                Console.WriteLine($"🔍 Evaluating delivered job {job.Id}...");
+                
+                await Task.Delay(1000);
+                
+                Console.WriteLine($"✅ Auto-approving job {job.Id}");
+                return (true, "Job delivered successfully, payment approved");
             },
            logger: logger
        );
 
         try
         {
-            await provider.StartAsync();
-            await client.StartAsync();
+            // await provider.StartAsync(); // provider (seller) functionality is not tested in this example
+            
+            // Start client with evaluatorAddress to receive onEvaluate events
+            // In self-evaluation scenarios (buyer = evaluator), this is required for onEvaluate to fire
+            await client.StartAsync(agentWalletBuyer, evaluatorAddress: agentWalletBuyer);
 
-            // Example 1: Create a job
+            // Example 1: Create a job (Real trading request)
             Console.WriteLine("Creating a new job...");
             var jobId = await client.InitiateJobAsync(
                 providerAddress: agentWalletSeller,
-                serviceRequirement: new
-                {
-                    message = "Create a simple website with contact form",
-                    requirements = new
-                    {
-                        pages = new[] { "home", "about", "contact" },
-                        features = new[] { "responsive", "contact form" }
-                    }
-                },
+                serviceRequirement: "Long BTC at 105k with $100 total. Add take profit at 108k and stop loss at 103k",
                 amount: 0.1m,
                 expiredAt: DateTime.UtcNow.AddDays(7)
             );
@@ -155,7 +193,7 @@ public class JobManagementExample
         }
         finally
         {
-            provider.Dispose();
+            // provider.Dispose(); // provider (seller) functionality is not tested in this example
             client.Dispose();
         }
     }

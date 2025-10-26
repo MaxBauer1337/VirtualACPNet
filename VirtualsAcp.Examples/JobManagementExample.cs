@@ -26,7 +26,7 @@ public class JobManagementExample
         
         // Requester (buyer) - Test requester credentials (pre-configured)
         string privateKeyBuyer = "YOUR_PRIVATE_KEY_HERE"; // ⚠️ Replace with your actual private key
-        string agentWalletBuyer = "0xE2B42Ff4BB15D7708994F94A6A3a0329c1CeE40d";
+        string agentWalletBuyer = "YOUR_WALLET_ADDRESS_HERE"; // ⚠️ Replace with your actual wallet address
 
         // Validate configuration
         if (string.IsNullOrWhiteSpace(agentWalletSeller))

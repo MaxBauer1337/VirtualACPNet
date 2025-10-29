@@ -59,13 +59,7 @@ public class ACPSocketIO : IDisposable
         // Convert from API URL to Socket.IO URL
         // From: https://acpx.virtuals.io/api
         // To: https://acpx.virtuals.io (remove /api suffix)
-
-        if (apiUrl.EndsWith("/api"))
-        {
-            return apiUrl.Substring(0, apiUrl.Length - 4);
-        }
-
-        return apiUrl;
+        return apiUrl.Replace("/api", string.Empty);
     }
 
     private void SetupEventHandlers()

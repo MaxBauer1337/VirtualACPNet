@@ -101,27 +101,27 @@ public class ACPSocketIO : IDisposable
 
     private void SetupConnectionEvents()
     {
-        _client.OnConnected += async (sender, e) =>
+        _client.OnConnected += (sender, e) =>
         {
             _logger?.LogInformation("Socket.IO connection established");
         };
 
-        _client.OnDisconnected += async (sender, e) =>
+        _client.OnDisconnected += (sender, e) =>
         {
             _logger?.LogWarning("Socket.IO disconnected: {Reason}", e);
         };
 
-        _client.OnReconnectAttempt += async (sender, e) =>
+        _client.OnReconnectAttempt += (sender, e) =>
         {
             _logger?.LogInformation("Socket.IO reconnection attempt: {Attempt}", e);
         };
 
-        _client.OnReconnected += async (sender, e) =>
+        _client.OnReconnected += (sender, e) =>
         {
             _logger?.LogInformation("Socket.IO reconnected after {Attempt} attempts", e);
         };
 
-        _client.OnError += async (sender, e) =>
+        _client.OnError += (sender, e) =>
         {
             _logger?.LogError("Socket.IO error: {Error}", e);
         };
@@ -175,28 +175,7 @@ public class ACPSocketIO : IDisposable
         {
             _logger?.LogError(ex, "Error stopping Socket.IO connection");
         }
-    }
-
-    public async Task EmitAsync(string eventName, object data)
-    {
-        try
-        {
-            if (_client.Connected)
-            {
-                await _client.EmitAsync(eventName, data);
-                _logger?.LogDebug("Emitted event: {EventName}", eventName);
-            }
-            else
-            {
-                _logger?.LogWarning("Cannot emit event {EventName}: not connected", eventName);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Failed to emit event: {EventName}", eventName);
-            throw;
-        }
-    }
+    }   
 
     public void SafeRun(Func<Task> action, string operationName = "async operation")
     {

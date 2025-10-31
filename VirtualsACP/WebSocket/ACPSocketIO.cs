@@ -14,7 +14,7 @@ public class ACPSocketIO : IDisposable
     public event Func<object, Task>? OnEvaluate;
     public event Func<object, Task>? OnNewTask;
 
-    public ACPSocketIO(string socketUrl, ILogger? logger = null, string agent = null)
+    public ACPSocketIO(string socketUrl, string contract, ILogger? logger = null, string agent = null)
     {
         _logger = logger;
 
@@ -23,28 +23,28 @@ public class ACPSocketIO : IDisposable
 
         _client = new SocketIOClient.SocketIO(socketIOUrl, new SocketIOOptions
         {
-            // Use WebSocket transport (equivalent to transports=['websocket'] in Python)
+            // Use WebSocket transport
             Transport = SocketIOClient.Transport.TransportProtocol.WebSocket,
 
-            // Enable automatic reconnection (equivalent to retry=True in Python)
+            // Enable automatic reconnection
             Reconnection = true,
             ReconnectionAttempts = int.MaxValue,
             ReconnectionDelay = 1000,
+            RandomizationFactor = 0.5,
             ReconnectionDelayMax = 5000,
+            ConnectionTimeout = TimeSpan.FromSeconds(10),
 
-            // Add SDK headers (equivalent to headers_data in Python)
             ExtraHeaders = new Dictionary<string, string>
             {
                 ["x-sdk-version"] = VirtualsAcp.Version,
-                ["x-sdk-language"] = "csharp"
+                ["x-sdk-language"] = "csharp",
+                ["x-contract-address"] = contract
             },
 
             Auth = new Dictionary<string, string>
             {
                 ["walletAddress"] = agent,
             },
-
-            ConnectionTimeout = TimeSpan.FromSeconds(20),
 
             // Enable all transports as fallback
             AutoUpgrade = true

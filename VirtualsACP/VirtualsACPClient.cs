@@ -41,7 +41,7 @@ public class VirtualsACPClient : IDisposable
         // Initialize SignalR client if callbacks are provided
         if (onNewTask != null || onEvaluate != null)
         {
-            socketClient = new ACPSocketIO(_config.AcpApiUrl, logger, _agentAddress);
+            socketClient = new ACPSocketIO(_config.AcpApiUrl, _config.ContractAddress, logger, _agentAddress);
             socketClient.OnNewTask += HandleNewTaskAsync;
             socketClient.OnEvaluate += HandleEvaluateAsync;
             OnNewTask = onNewTask;
@@ -147,8 +147,8 @@ public class VirtualsACPClient : IDisposable
             }
 
             Dictionary<string, object>? context = null;
-            if (jobData.TryGetValue("context", out var contextValue) && 
-                contextValue is JsonElement contextElement && 
+            if (jobData.TryGetValue("context", out var contextValue) &&
+                contextValue is JsonElement contextElement &&
                 contextElement.ValueKind != JsonValueKind.Null)
             {
                 context = JsonSerializer.Deserialize<Dictionary<string, object>>(contextElement.GetRawText());
@@ -173,24 +173,24 @@ public class VirtualsACPClient : IDisposable
             {
                 // In self-evaluation scenarios, the memo to sign is DELIVER_SERVICE with nextPhase=4
                 var memoToSign = job.Memos.FirstOrDefault(x => x.Type == "DELIVER_SERVICE" && x.NextPhase == AcpJobPhase.Completed);
-                
+
                 if (memoToSign == null)
                 {
                     // Fallback: try REQUEST_EVALUATION for non-self-evaluation scenarios
                     memoToSign = job.Memos.FirstOrDefault(x => x.Type == "REQUEST_EVALUATION");
                 }
-                
+
                 var (accepted, reason) = await OnEvaluate(job, memoToSign);
-                
+
                 // Sign the correct memo (the one that's PENDING and needs signature)
                 var memoIdToSign = memoToSign?.Id ?? job.LatestMemo?.Id ?? 0;
-                
+
                 if (memoIdToSign == 0)
                 {
                     _logger?.LogError("No valid memo to sign for job {JobId} evaluation", job.Id);
                     return;
                 }
-                
+
                 await SignMemoAsync(memoIdToSign, accepted, reason);
             }
         }
@@ -243,7 +243,7 @@ public class VirtualsACPClient : IDisposable
 
         // Set budget
         await _blockchainClient.SetBudgetWithPaymentTokenAsync((int)jobId, amount);
-        
+
         // Create initial memo
         var memoContent = serviceRequirement is string str
             ? str
@@ -334,7 +334,7 @@ public class VirtualsACPClient : IDisposable
         // This tells the seller that payment is complete and they should deliver
         // Reference: Official Python SDK's pay_and_accept_requirement() does this
         await Task.Delay(5000); // Allow payment memo to settle
-        
+
         await _blockchainClient.CreateMemoAsync(
             jobId,
             $"Payment made. {reason ?? ""}".Trim(),
@@ -342,9 +342,9 @@ public class VirtualsACPClient : IDisposable
             true,
             AcpJobPhase.Evaluation // ← Transitions job to EVALUATION phase, triggers seller
         );
-        
+
         _logger?.LogInformation("Created EVALUATION trigger memo for job {JobId}", jobId);
-        
+
         return new Dictionary<string, object> { ["txHash"] = txHash };
     }
 

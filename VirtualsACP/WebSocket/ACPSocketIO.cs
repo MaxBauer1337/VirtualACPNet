@@ -71,7 +71,7 @@ public class ACPSocketIO : IDisposable
 
             if (OnRoomJoined != null)
             {
-                _ = Task.Run(async () => await OnRoomJoined(data));
+                SafeRun(() => OnRoomJoined(data), "OnRoomJoined");
             }
         });
 
@@ -81,7 +81,7 @@ public class ACPSocketIO : IDisposable
 
             if (OnEvaluate != null)
             {
-                _ = Task.Run(async () => await OnEvaluate(data));
+                SafeRun(() => OnEvaluate(data), "OnEvaluate");
             }
             else
             {
@@ -95,7 +95,7 @@ public class ACPSocketIO : IDisposable
 
             if (OnNewTask != null)
             {
-                _ = Task.Run(async () => await OnNewTask(data));
+                SafeRun(() => OnNewTask(data), "OnNewTask");
             }
             else
             {
@@ -201,6 +201,21 @@ public class ACPSocketIO : IDisposable
             _logger?.LogError(ex, "Failed to emit event: {EventName}", eventName);
             throw;
         }
+    }
+
+    public void SafeRun(Func<Task> action, string operationName = "async operation")
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await action();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError($"Error during {operationName}: {ex.Message}");
+            }
+        });
     }
 
     public bool IsConnected => _client?.Connected ?? false;

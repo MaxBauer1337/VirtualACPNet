@@ -39,12 +39,7 @@ public class ACPSocketIO : IDisposable
                 ["x-sdk-version"] = VirtualsAcp.Version,
                 ["x-sdk-language"] = "csharp",
                 ["x-contract-address"] = contract
-            },
-
-            Auth = new Dictionary<string, string>
-            {
-                ["walletAddress"] = agent,
-            },
+            },           
 
             // Enable all transports as fallback
             AutoUpgrade = true

@@ -130,6 +130,15 @@ public class AcpApiClient : IDisposable
         return await GetJobsAsync("cancelled", walletAddress, page, pageSize);
     }
 
+    public async Task<List<ACPJob>> GetPendingMemoJobsAsync(string walletAddress, int page = 1, int pageSize = 10)
+    {
+        var url = $"{_baseUrl}/jobs/pending-memos?pagination[page]={page}&pagination[pageSize]={pageSize}";
+        var headers = new Dictionary<string, string> { ["wallet-address"] = walletAddress };
+        
+        var result = await SendRequestAsync<List<ACPJob>>(url, headers, "getting pending memo jobs");
+        return result ?? new List<ACPJob>();
+    }
+
     private async Task<List<ACPJob>> GetJobsAsync(string jobType, string walletAddress, int page, int pageSize)
     {
         var url = $"{_baseUrl}/jobs/{jobType}?pagination[page]={page}&pagination[pageSize]={pageSize}";

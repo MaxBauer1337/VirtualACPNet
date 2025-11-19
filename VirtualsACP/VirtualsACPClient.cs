@@ -515,6 +515,11 @@ public class VirtualsACPClient : IDisposable
         return await _apiClient.GetCancelledJobsAsync(_agentAddress, page, pageSize);
     }
 
+    public async Task<List<ACPJob>> GetPendingMemoJobsAsync(int page = 1, int pageSize = 10)
+    {
+        return await _apiClient.GetPendingMemoJobsAsync(_agentAddress, page, pageSize);
+    }
+
     public async Task<ACPJob?> GetJobByIdAsync(int jobId)
     {
         return await _apiClient.GetJobByIdAsync(jobId, _agentAddress);

@@ -58,15 +58,28 @@ public class NethereumBlockchainClient : IDisposable
         return (BigInteger)(amount * (decimal)multiplier);
     }
 
-    public async Task<string> CreateJobAsync(string providerAddress, string evaluatorAddress, DateTime expiredAt)
+    public async Task<string> CreateJobAsync(
+        string providerAddress,
+        string evaluatorAddress,
+        DateTime expiredAt,
+        string paymentToken,
+        decimal budget,
+        string metadata)
     {
         try
         {
             var expireTimestamp = new BigInteger(((DateTimeOffset)expiredAt).ToUnixTimeSeconds());
+            var formattedBudget = FormatAmount(budget);
 
             var function = _contract.GetFunction("createJob");
 
-            string txHash = await EstimateGasAndSend(function, providerAddress, evaluatorAddress, expireTimestamp);
+            string txHash = await EstimateGasAndSend(function,
+                providerAddress,
+                evaluatorAddress,
+                expireTimestamp,
+                paymentToken,
+                formattedBudget,
+                metadata);
 
             _logger?.LogInformation("Job creation transaction sent: {TxHash}", txHash);
             return txHash;
@@ -169,9 +182,10 @@ public class NethereumBlockchainClient : IDisposable
         string receiverAddress,
         decimal feeAmount,
         FeeType feeType,
-        AcpJobPhase nextPhase,
         MemoType memoType,
         DateTime expiredAt,
+        bool isSecured,
+        AcpJobPhase nextPhase,
         string? token = null)
     {
         try
@@ -184,7 +198,7 @@ public class NethereumBlockchainClient : IDisposable
             var function = _contract.GetFunction("createPayableMemo");
 
             string txHash = await EstimateGasAndSend(function,
-               jobId,
+                jobId,
                 content,
                 tokenAddress,
                 formattedAmount,
@@ -192,8 +206,9 @@ public class NethereumBlockchainClient : IDisposable
                 formattedFeeAmount,
                 (int)feeType,
                 (int)memoType,
-                (int)nextPhase,
-                expireTimestamp);
+                expireTimestamp,
+                isSecured,
+                (int)nextPhase);
 
             _logger?.LogInformation("Payable memo creation transaction sent: {TxHash}", txHash);
             return txHash;

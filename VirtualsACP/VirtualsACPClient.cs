@@ -235,20 +235,23 @@ public class VirtualsACPClient : IDisposable
             throw new ArgumentException("You cannot initiate a job with yourself as the provider");
 
         // Create job on blockchain
-        var txHash = await _blockchainClient.CreateJobAsync(providerAddress, evalAddr, expiredAt.Value);
+        var memoContent = serviceRequirement is string str
+            ? str
+            : JsonSerializer.Serialize(serviceRequirement);
+        
+        var txHash = await _blockchainClient.CreateJobAsync(
+            providerAddress,
+            evalAddr,
+            expiredAt.Value,
+            _config.PaymentTokenAddress,
+            amount,
+            memoContent);
 
         var jobId = await _blockchainClient.GetJobIdFromTransactionAsync(txHash);
 
         await Task.Delay(2000); // needed for some reason, maybe rpc to slow??
 
-        // Set budget
-        await _blockchainClient.SetBudgetWithPaymentTokenAsync((int)jobId, amount);
-
         // Create initial memo
-        var memoContent = serviceRequirement is string str
-            ? str
-            : JsonSerializer.Serialize(serviceRequirement);
-
         await _blockchainClient.CreateMemoAsync(
             (int)jobId,
             memoContent,
@@ -365,9 +368,10 @@ public class VirtualsACPClient : IDisposable
             receiverAddress,
             feeAmount,
             feeType,
-            nextPhase,
             MemoType.PayableRequest,
-            expiredAt
+            expiredAt,
+            false,
+            nextPhase
         );
 
         return txHash;
@@ -418,9 +422,10 @@ public class VirtualsACPClient : IDisposable
             receiverAddress,
             feeAmount,
             feeType,
-            nextPhase,
             MemoType.PayableTransferEscrow,
-            expiredAt
+            expiredAt,
+            false,
+            nextPhase
         );
 
         _logger?.LogInformation(

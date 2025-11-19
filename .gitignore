@@ -363,3 +363,6 @@ MigrationBackup/
 FodyWeavers.xsd
 
 acp-node/
+
+# Test configuration (contains sensitive credentials)
+VirtualsACP.Tests/test-config.json

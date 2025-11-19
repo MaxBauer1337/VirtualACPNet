@@ -51,6 +51,7 @@ public class VirtualsACPClient : IDisposable
 
     public string AgentAddress => _agentAddress;
     public string SignerAddress => _blockchainClient.AgentAddress;
+    public bool IsConnected => socketClient?.IsConnected ?? false;
 
     public async Task StartAsync(string? walletAddress = null, string? evaluatorAddress = null)
     {

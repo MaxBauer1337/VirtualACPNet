@@ -231,7 +231,63 @@ public class AcpApiClient : IDisposable
             _logger?.LogError(ex, "Unexpected error while getting agent {WalletAddress}", walletAddress);
             throw new AcpError("An unexpected error occurred while getting agent", ex);
         }
-    }   
+    }
+
+    public async Task<AcpAccountData?> GetAccountByJobIdAsync(int jobId)
+    {
+        try
+        {
+            var url = $"{_baseUrl}/accounts/job/{jobId}";
+
+            _logger?.LogDebug("Making request to: {Url}", url);
+
+            var response = await _httpClient.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<ApiResponse<AcpAccountData>>(content);
+
+            return result?.Data;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger?.LogError(ex, "HTTP error while getting account by job ID {JobId}", jobId);
+            throw new AcpApiError($"Failed to get account by job ID: {jobId}", ex);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Unexpected error while getting account by job ID {JobId}", jobId);
+            throw new AcpError($"An unexpected error occurred while getting account by job ID: {jobId}", ex);
+        }
+    }
+
+    public async Task<AcpAccountData?> GetAccountByClientAndProviderAsync(string clientAddress, string providerAddress)
+    {
+        try
+        {
+            var url = $"{_baseUrl}/accounts/client/{Uri.EscapeDataString(clientAddress)}/provider/{Uri.EscapeDataString(providerAddress)}";
+
+            _logger?.LogDebug("Making request to: {Url}", url);
+
+            var response = await _httpClient.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<ApiResponse<AcpAccountData>>(content);
+
+            return result?.Data;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger?.LogError(ex, "HTTP error while getting account by client {ClientAddress} and provider {ProviderAddress}", clientAddress, providerAddress);
+            throw new AcpApiError("Failed to get account by client and provider", ex);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Unexpected error while getting account by client {ClientAddress} and provider {ProviderAddress}", clientAddress, providerAddress);
+            throw new AcpError("An unexpected error occurred while getting account by client and provider", ex);
+        }
+    }
 
     public void Dispose()
     {

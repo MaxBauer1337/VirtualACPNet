@@ -265,6 +265,95 @@ public class NethereumBlockchainClient : IDisposable
         }
     }
 
+    public async Task<string> CreateAccountAsync(string providerAddress, string metadata)
+    {
+        try
+        {
+            var function = _contract.GetFunction("createAccount");
+
+            string txHash = await EstimateGasAndSend(function, providerAddress, metadata);
+
+            _logger?.LogInformation("Account creation transaction sent: {TxHash}", txHash);
+            return txHash;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to create account");
+            throw new AcpContractError("Failed to create account", ex);
+        }
+    }
+
+    public async Task<string> CreateJobWithAccountAsync(
+        int accountId,
+        string evaluatorAddress,
+        decimal budget,
+        string paymentToken,
+        DateTime expiredAt)
+    {
+        try
+        {
+            var expireTimestamp = new BigInteger(((DateTimeOffset)expiredAt).ToUnixTimeSeconds());
+            var formattedBudget = FormatAmount(budget);
+
+            var function = _contract.GetFunction("createJobWithAccount");
+
+            string txHash = await EstimateGasAndSend(function,
+                accountId,
+                evaluatorAddress,
+                formattedBudget,
+                paymentToken,
+                expireTimestamp);
+
+            _logger?.LogInformation("Job creation with account transaction sent: {TxHash}", txHash);
+            return txHash;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to create job with account");
+            throw new AcpContractError("Failed to create job with account", ex);
+        }
+    }
+
+    public async Task<AccountInfo> GetAccountAsync(int accountId)
+    {
+        try
+        {
+            var function = _contract.GetFunction("getAccount");
+            var result = await function.CallDeserializingToObjectAsync<AccountInfo>(accountId);
+
+            if (result == null)
+            {
+                throw new AcpContractError($"Account not found: {accountId}");
+            }
+
+            _logger?.LogInformation("Account retrieved: {AccountId}", accountId);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to get account: {AccountId}", accountId);
+            throw new AcpContractError($"Failed to get account: {accountId}", ex);
+        }
+    }
+
+    public async Task<string> UpdateAccountMetadataAsync(int accountId, string metadata)
+    {
+        try
+        {
+            var function = _contract.GetFunction("updateAccountMetadata");
+
+            string txHash = await EstimateGasAndSend(function, accountId, metadata);
+
+            _logger?.LogInformation("Account metadata update transaction sent: {TxHash}", txHash);
+            return txHash;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to update account metadata");
+            throw new AcpContractError("Failed to update account metadata", ex);
+        }
+    }
+
     public async Task<BigInteger> GetJobIdFromTransactionAsync(string txHash)
     {
         try

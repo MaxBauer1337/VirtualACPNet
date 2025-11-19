@@ -234,18 +234,35 @@ public class VirtualsACPClient : IDisposable
         if (providerAddress.Equals(_agentAddress, StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("You cannot initiate a job with yourself as the provider");
 
-        // Create job on blockchain
+        // Check for existing account between client and provider
+        var account = await GetByClientAndProviderAsync(_agentAddress, providerAddress);
+
         var memoContent = serviceRequirement is string str
             ? str
             : JsonSerializer.Serialize(serviceRequirement);
-        
-        var txHash = await _blockchainClient.CreateJobAsync(
-            providerAddress,
-            evalAddr,
-            expiredAt.Value,
-            _config.PaymentTokenAddress,
-            amount,
-            memoContent);
+
+        string txHash;
+        if (account != null)
+        {
+            // Use existing account to create job
+            txHash = await _blockchainClient.CreateJobWithAccountAsync(
+                account.Id,
+                evalAddr,
+                amount,
+                _config.PaymentTokenAddress,
+                expiredAt.Value);
+        }
+        else
+        {
+            // Create new job without account
+            txHash = await _blockchainClient.CreateJobAsync(
+                providerAddress,
+                evalAddr,
+                expiredAt.Value,
+                _config.PaymentTokenAddress,
+                amount,
+                memoContent);
+        }
 
         var jobId = await _blockchainClient.GetJobIdFromTransactionAsync(txHash);
 
@@ -511,6 +528,48 @@ public class VirtualsACPClient : IDisposable
     public async Task<IACPAgent?> GetAgentAsync(string walletAddress)
     {
         return await _apiClient.GetAgentAsync(walletAddress);
+    }
+
+    public async Task<AcpAccount?> GetAccountByJobIdAsync(int jobId)
+    {
+        var accountData = await _apiClient.GetAccountByJobIdAsync(jobId);
+        if (accountData == null)
+        {
+            return null;
+        }
+
+        var metadata = accountData.Metadata ?? new Dictionary<string, object>();
+        return new AcpAccount(
+            _blockchainClient,
+            accountData.Id,
+            accountData.ClientAddress,
+            accountData.ProviderAddress,
+            metadata);
+    }
+
+    public async Task<AcpAccount?> GetByClientAndProviderAsync(string clientAddress, string providerAddress)
+    {
+        var accountData = await _apiClient.GetAccountByClientAndProviderAsync(clientAddress, providerAddress);
+        if (accountData == null)
+        {
+            return null;
+        }
+
+        var metadata = accountData.Metadata ?? new Dictionary<string, object>();
+        return new AcpAccount(
+            _blockchainClient,
+            accountData.Id,
+            accountData.ClientAddress,
+            accountData.ProviderAddress,
+            metadata);
+    }
+
+    public async Task<string> CreateAccountAsync(string providerAddress, Dictionary<string, object> metadata)
+    {
+        var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
+        var txHash = await _blockchainClient.CreateAccountAsync(providerAddress, metadataJson);
+        _logger?.LogInformation("Account creation transaction sent: {TxHash}", txHash);
+        return txHash;
     }
 
     public void Dispose()

@@ -184,6 +184,47 @@ public class AcpApiClient : IDisposable
         return await SendRequestAsync<AcpAccountData>(url, null, $"getting account by client {clientAddress} and provider {providerAddress}");
     }
 
+    public async Task<OffChainJob> UpdateJobX402NonceAsync(int jobId, string nonce, string signature)
+    {
+        try
+        {
+            var url = $"{_baseUrl}/jobs/{jobId}/x402-nonce";
+
+            _logger?.LogDebug("Making request to: {Url}", url);
+
+            var request = new HttpRequestMessage(HttpMethod.Post, url);
+            request.Headers.Add("x-signature", signature);
+            request.Headers.Add("x-nonce", nonce);
+            request.Content = new StringContent(
+                System.Text.Json.JsonSerializer.Serialize(new { data = new { nonce } }),
+                System.Text.Encoding.UTF8,
+                "application/json");
+
+            var response = await _httpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync();
+            var result = System.Text.Json.JsonSerializer.Deserialize<OffChainJob>(content);
+
+            if (result == null)
+            {
+                throw new AcpApiError($"Failed to deserialize response for job {jobId}");
+            }
+
+            return result;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger?.LogError(ex, "HTTP error while updating X402 nonce for job {JobId}", jobId);
+            throw new AcpApiError($"Failed to update X402 nonce for job: {jobId}", ex);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Unexpected error while updating X402 nonce for job {JobId}", jobId);
+            throw new AcpError($"An unexpected error occurred while updating X402 nonce for job: {jobId}", ex);
+        }
+    }
+
     public void Dispose()
     {
         _httpClient?.Dispose();

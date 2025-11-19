@@ -491,6 +491,167 @@ public class NethereumBlockchainClient : IDisposable
         }
     }
 
+    public async Task<IAcpJobX402PaymentDetails> GetX402PaymentDetailsAsync(int jobId)
+    {
+        try
+        {
+            var function = _contract.GetFunction("x402PaymentDetails");
+            var result = await function.CallDeserializingToObjectAsync<X402PaymentDetailsResult>(jobId);
+
+            if (result == null)
+            {
+                throw new AcpContractError($"Failed to get X402 payment details for job {jobId}");
+            }
+
+            var details = new IAcpJobX402PaymentDetails
+            {
+                IsX402 = result.IsX402,
+                IsBudgetReceived = result.IsBudgetReceived
+            };
+
+            _logger?.LogInformation("X402 payment details for job {JobId}: IsX402={IsX402}, IsBudgetReceived={IsBudgetReceived}", 
+                jobId, details.IsX402, details.IsBudgetReceived);
+            return details;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to get X402 payment details for job {JobId}", jobId);
+            throw new AcpContractError($"Failed to get X402 payment details for job: {jobId}", ex);
+        }
+    }
+
+    [FunctionOutput]
+    private class X402PaymentDetailsResult
+    {
+        [Parameter("bool", "isX402", 1)]
+        public bool IsX402 { get; set; }
+
+        [Parameter("bool", "isBudgetReceived", 2)]
+        public bool IsBudgetReceived { get; set; }
+    }
+
+    public async Task<string> CreateX402JobAsync(
+        string providerAddress,
+        string evaluatorAddress,
+        DateTime expiredAt,
+        string paymentToken,
+        decimal budget,
+        string metadata)
+    {
+        try
+        {
+            var expireTimestamp = new BigInteger(((DateTimeOffset)expiredAt).ToUnixTimeSeconds());
+            var formattedBudget = FormatAmount(budget);
+
+            var function = _contract.GetFunction("createX402Job");
+
+            string txHash = await EstimateGasAndSend(function,
+                providerAddress,
+                evaluatorAddress,
+                expireTimestamp,
+                paymentToken,
+                formattedBudget,
+                metadata);
+
+            _logger?.LogInformation("X402 job creation transaction sent: {TxHash}", txHash);
+            return txHash;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to create X402 job");
+            throw new AcpContractError("Failed to create X402 job", ex);
+        }
+    }
+
+    public async Task<string> CreateX402JobWithAccountAsync(
+        int accountId,
+        string evaluatorAddress,
+        decimal budget,
+        string paymentToken,
+        DateTime expiredAt)
+    {
+        try
+        {
+            var expireTimestamp = new BigInteger(((DateTimeOffset)expiredAt).ToUnixTimeSeconds());
+            var formattedBudget = FormatAmount(budget);
+
+            var function = _contract.GetFunction("createX402JobWithAccount");
+
+            string txHash = await EstimateGasAndSend(function,
+                accountId,
+                evaluatorAddress,
+                formattedBudget,
+                paymentToken,
+                expireTimestamp);
+
+            _logger?.LogInformation("X402 job creation with account transaction sent: {TxHash}", txHash);
+            return txHash;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to create X402 job with account");
+            throw new AcpContractError("Failed to create X402 job with account", ex);
+        }
+    }
+
+    public async Task<string> SubmitTransferWithAuthorizationAsync(
+        string from,
+        string to,
+        BigInteger value,
+        BigInteger validAfter,
+        BigInteger validBefore,
+        string nonce,
+        string signature)
+    {
+        try
+        {
+            // Parse signature into v, r, s components
+            var signatureBytes = signature.HexToByteArray();
+            if (signatureBytes.Length != 65)
+            {
+                throw new AcpContractError("Invalid signature length");
+            }
+
+            var v = signatureBytes[64];
+            var r = new byte[32];
+            var s = new byte[32];
+            Array.Copy(signatureBytes, 0, r, 0, 32);
+            Array.Copy(signatureBytes, 32, s, 0, 32);
+
+            // Convert nonce from hex string to bytes32
+            var nonceBytes = nonce.HexToByteArray();
+            if (nonceBytes.Length > 32)
+            {
+                throw new AcpContractError("Invalid nonce length");
+            }
+
+            var nonceBytes32 = new byte[32];
+            Array.Copy(nonceBytes, 0, nonceBytes32, 32 - nonceBytes.Length, nonceBytes.Length);
+
+            var fiatTokenContract = _web3.Eth.GetContract(ContractAbis.Erc20Abi, _config.PaymentTokenAddress);
+            var function = fiatTokenContract.GetFunction("transferWithAuthorization");
+
+            string txHash = await EstimateGasAndSend(function,
+                from,
+                to,
+                value,
+                validAfter,
+                validBefore,
+                nonceBytes32,
+                v,
+                r,
+                s);
+
+            _logger?.LogInformation("Transfer with authorization transaction sent: {TxHash}", txHash);
+            return txHash;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to submit transfer with authorization");
+            throw new AcpContractError("Failed to submit transfer with authorization", ex);
+        }
+    }
+
     public async Task<BigInteger> GetJobIdFromTransactionAsync(string txHash)
     {
         try

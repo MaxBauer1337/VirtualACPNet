@@ -354,6 +354,143 @@ public class NethereumBlockchainClient : IDisposable
         }
     }
 
+    public async Task<MemoResult> GetAllMemosAsync(int jobId, int offset, int limit)
+    {
+        try
+        {
+            var function = _contract.GetFunction("getAllMemos");
+            var result = await function.CallDeserializingToObjectAsync<MemoResult>(jobId, offset, limit);
+
+            if (result == null)
+            {
+                throw new AcpContractError($"Failed to get memos for job {jobId}");
+            }
+
+            _logger?.LogInformation("Retrieved {Count} memos for job {JobId} (total: {Total})", result.Memos?.Count ?? 0, jobId, result.Total);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to get all memos for job {JobId}", jobId);
+            throw new AcpContractError($"Failed to get all memos for job: {jobId}", ex);
+        }
+    }
+
+    public async Task<MemoResult> GetMemosForMemoTypeAsync(int jobId, MemoType memoType, int offset, int limit)
+    {
+        try
+        {
+            var function = _contract.GetFunction("getMemosForMemoType");
+            var result = await function.CallDeserializingToObjectAsync<MemoResult>(jobId, (int)memoType, offset, limit);
+
+            if (result == null)
+            {
+                throw new AcpContractError($"Failed to get memos for memo type {memoType} in job {jobId}");
+            }
+
+            _logger?.LogInformation("Retrieved {Count} memos of type {MemoType} for job {JobId} (total: {Total})", result.Memos?.Count ?? 0, memoType, jobId, result.Total);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to get memos for memo type {MemoType} in job {JobId}", memoType, jobId);
+            throw new AcpContractError($"Failed to get memos for memo type {memoType} in job: {jobId}", ex);
+        }
+    }
+
+    public async Task<MemoResult> GetMemosForPhaseTypeAsync(int jobId, AcpJobPhase phase, int offset, int limit)
+    {
+        try
+        {
+            var function = _contract.GetFunction("getMemosForPhaseType");
+            var result = await function.CallDeserializingToObjectAsync<MemoResult>(jobId, (int)phase, offset, limit);
+
+            if (result == null)
+            {
+                throw new AcpContractError($"Failed to get memos for phase {phase} in job {jobId}");
+            }
+
+            _logger?.LogInformation("Retrieved {Count} memos for phase {Phase} in job {JobId} (total: {Total})", result.Memos?.Count ?? 0, phase, jobId, result.Total);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to get memos for phase {Phase} in job {JobId}", phase, jobId);
+            throw new AcpContractError($"Failed to get memos for phase {phase} in job: {jobId}", ex);
+        }
+    }
+
+    public async Task<bool> CanSignAsync(string account, int jobId)
+    {
+        try
+        {
+            var function = _contract.GetFunction("canSign");
+            var result = await function.CallAsync<bool>(account, jobId);
+
+            _logger?.LogInformation("Can sign check for account {Account} and job {JobId}: {Result}", account, jobId, result);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to check if account {Account} can sign job {JobId}", account, jobId);
+            throw new AcpContractError($"Failed to check if account can sign job: {jobId}", ex);
+        }
+    }
+
+    public async Task<bool> IsJobEvaluatorAsync(int jobId, string account)
+    {
+        try
+        {
+            var function = _contract.GetFunction("isJobEvaluator");
+            var result = await function.CallAsync<bool>(jobId, account);
+
+            _logger?.LogInformation("Is evaluator check for account {Account} and job {JobId}: {Result}", account, jobId, result);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to check if account {Account} is evaluator for job {JobId}", account, jobId);
+            throw new AcpContractError($"Failed to check if account is evaluator for job: {jobId}", ex);
+        }
+    }
+
+    public async Task<string> ClaimBudgetAsync(int jobId)
+    {
+        try
+        {
+            var function = _contract.GetFunction("claimBudget");
+
+            string txHash = await EstimateGasAndSend(function, jobId);
+
+            _logger?.LogInformation("Claim budget transaction sent for job {JobId}: {TxHash}", jobId, txHash);
+            return txHash;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to claim budget for job {JobId}", jobId);
+            throw new AcpContractError($"Failed to claim budget for job: {jobId}", ex);
+        }
+    }
+
+    public async Task<string> SetBudgetAsync(int jobId, decimal amount)
+    {
+        try
+        {
+            var formattedAmount = FormatAmount(amount);
+            var function = _contract.GetFunction("setBudget");
+
+            string txHash = await EstimateGasAndSend(function, jobId, formattedAmount);
+
+            _logger?.LogInformation("Set budget transaction sent for job {JobId}: {TxHash}", jobId, txHash);
+            return txHash;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to set budget for job {JobId}", jobId);
+            throw new AcpContractError($"Failed to set budget for job: {jobId}", ex);
+        }
+    }
+
     public async Task<BigInteger> GetJobIdFromTransactionAsync(string txHash)
     {
         try

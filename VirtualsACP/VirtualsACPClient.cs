@@ -208,7 +208,7 @@ public class VirtualsACPClient : IDisposable
         AcpGraduationStatus? graduationStatus = null,
         AcpOnlineStatus? onlineStatus = null)
     {
-        return await _apiClient.BrowseAgentsAsync(
+        var agents = await _apiClient.BrowseAgentsAsync(
             keyword,
             cluster,
             sortBy,
@@ -217,6 +217,16 @@ public class VirtualsACPClient : IDisposable
             onlineStatus,
             _agentAddress
         );
+
+        // Filter by contract address and exclude current wallet (matching JS behavior)
+        var contractAddressLower = _config.ContractAddress.ToLowerInvariant();
+        return agents
+            .Where(agent => 
+                !string.IsNullOrEmpty(agent.WalletAddress) &&
+                !agent.WalletAddress.Equals(_agentAddress, StringComparison.OrdinalIgnoreCase) &&
+                (!string.IsNullOrEmpty(agent.ContractAddress) &&
+                 agent.ContractAddress.Equals(_config.ContractAddress, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
     }
 
     public async Task<int> InitiateJobAsync(

@@ -78,7 +78,7 @@ public class AcpApiClient : IDisposable
         AcpOnlineStatus? onlineStatus = null,
         string? walletAddressToExclude = null)
     {
-        var url = $"{_baseUrl}/agents/v2/search?search={Uri.EscapeDataString(keyword)}";
+        var url = $"{_baseUrl}/agents/v3/search?search={Uri.EscapeDataString(keyword)}";
         
         if (sortBy != null && sortBy.Any())
         {

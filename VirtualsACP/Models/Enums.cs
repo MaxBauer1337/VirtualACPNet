@@ -14,7 +14,9 @@ public enum MemoType
     TxHash = 5,
     PayableRequest = 6,
     PayableTransfer = 7,
-    PayableTransferEscrow = 8
+    PayableTransferEscrow = 8,
+    Notification = 9,
+    PayableNotification = 10
 }
 
 public enum AcpJobPhase

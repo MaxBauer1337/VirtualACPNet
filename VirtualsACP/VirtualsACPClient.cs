@@ -479,6 +479,71 @@ public class VirtualsACPClient : IDisposable
         return txHash;
     }
 
+    public async Task<string> CreateNotificationAsync(int jobId, string content)
+    {
+        try
+        {
+            var txHash = await _blockchainClient.CreateMemoAsync(
+                jobId,
+                content,
+                MemoType.Notification,
+                true,
+                AcpJobPhase.Completed
+            );
+
+            _logger?.LogInformation("Notification memo created for job {JobId}, tx_hash: {TxHash}", jobId, txHash);
+            return txHash;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error creating notification memo for job {JobId}", jobId);
+            throw;
+        }
+    }
+
+    public async Task<string> CreatePayableNotificationAsync(
+        int jobId,
+        string content,
+        decimal amount,
+        string clientAddress,
+        DateTime? expiredAt = null)
+    {
+        try
+        {
+            if (expiredAt == null)
+            {
+                expiredAt = DateTime.UtcNow.AddMinutes(5);
+            }
+
+            // Approve allowance first
+            await _blockchainClient.ApproveAllowanceAsync(amount);
+
+            _logger?.LogInformation("Approved allowance for payable notification: {Amount}", amount);
+
+            // Create payable memo with Notification type
+            var txHash = await _blockchainClient.CreatePayableMemoAsync(
+                jobId,
+                content,
+                amount,
+                clientAddress,
+                feeAmount: 0,
+                FeeType.NoFee,
+                MemoType.PayableNotification,
+                expiredAt.Value,
+                isSecured: false,
+                AcpJobPhase.Completed
+            );
+
+            _logger?.LogInformation("Payable notification memo created for job {JobId}, tx_hash: {TxHash}", jobId, txHash);
+            return txHash;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error creating payable notification memo for job {JobId}", jobId);
+            throw;
+        }
+    }
+
     public async Task<string> RespondToFundsTransferAsync(
         int memoId,
         bool accept,
